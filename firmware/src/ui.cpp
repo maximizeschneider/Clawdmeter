@@ -20,6 +20,19 @@ LV_FONT_DECLARE(font_styrene_12);
 LV_FONT_DECLARE(font_mono_32);
 LV_FONT_DECLARE(font_mono_18);
 
+// Geometry of one usage panel (percentage + pill, bar, reset line). The usage
+// screen switches between two of these: "roomy" (the original two big panels)
+// and "dense" (three slimmer panels + a monthly line), the latter only once the
+// daemon sends a per-model limit or monthly totals.
+struct PanelGeom {
+    int16_t h, gap, pad_y;
+    int16_t pill_pad_x, pill_pad_y;
+    int16_t bar_y, bar_h, reset_y;
+    const lv_font_t* pct_font;
+    const lv_font_t* pill_font;
+    const lv_font_t* reset_font;
+};
+
 // Layout values computed from the active board's geometry. Populated once
 // in ui_init() and treated as const for the rest of the program. Adding a
 // new display size means extending compute_layout() with another
@@ -46,6 +59,8 @@ struct Layout {
     const lv_font_t* reset_font;     // "Resets in ..." line
     const lv_font_t* pace_font;      // enterprise "Under/On/Over pace" line
     const lv_font_t* anim_font;      // animated status line
+    PanelGeom roomy, dense;          // usage panel geometry, see PanelGeom
+    const lv_font_t* month_font;     // "This month" line under the dense panels
     int16_t anim_y;                  // status line offset from bottom
     bool    small_icons;             // 40px logo + 24px battery (vs 80/48) on small screens
     int16_t title_nudge;             // title x-shift balancing the corner logo
@@ -110,6 +125,9 @@ static void compute_layout(const BoardCaps& c) {
         L.usage_panel_gap = 16;
         L.usage_bar_y = 56;
         L.usage_reset_y = 94;
+        L.dense = { 90, 8, 8, 12, 2, 36, 12, 52,
+                    &font_styrene_28, &font_styrene_20, &font_styrene_20 };
+        L.month_font = &font_styrene_20;
         L.bt_info_panel_h = 160;
         L.bt_reset_zone_h = 110;
         L.bt_title_font    = &font_tiempos_56;
@@ -124,6 +142,9 @@ static void compute_layout(const BoardCaps& c) {
         L.usage_panel_gap = 12;
         L.usage_bar_y = 48;
         L.usage_reset_y = 78;
+        L.dense = { 80, 6, 6, 10, 2, 32, 10, 46,
+                    &font_styrene_24, &font_styrene_16, &font_styrene_16 };
+        L.month_font = &font_styrene_16;
         L.bt_info_panel_h = 140;
         L.bt_reset_zone_h = 90;
         L.bt_title_font    = &font_tiempos_34;
@@ -142,6 +163,9 @@ static void compute_layout(const BoardCaps& c) {
         L.usage_panel_gap = 6;
         L.usage_bar_y = 30;
         L.usage_reset_y = 46;
+        L.dense = { 46, 4, 3, 6, 0, 18, 6, 26,
+                    &font_styrene_14, &font_styrene_12, &font_styrene_12 };
+        L.month_font = &font_styrene_12;
         L.bar_h = 12;
         L.panel_pad_x = 10;
         L.panel_pad_y = 6;
@@ -176,6 +200,9 @@ static void compute_layout(const BoardCaps& c) {
     }
 
     L.content_w = L.scr_w - 2 * L.margin;
+    L.roomy = { L.usage_panel_h, L.usage_panel_gap, L.panel_pad_y,
+                L.pill_pad_x, L.pill_pad_y, L.usage_bar_y, L.bar_h, L.usage_reset_y,
+                L.pct_font, L.pill_font, L.reset_font };
 }
 
 // Anthropic brand palette — design tokens live in theme.h
@@ -211,6 +238,13 @@ static lv_obj_t* lbl_weekly_label;
 static lv_obj_t* lbl_weekly_reset;
 static lv_obj_t* panel_session = nullptr;
 static lv_obj_t* panel_weekly = nullptr;
+// Optional third panel (per-model weekly limit, e.g. Fable) + monthly totals line
+static lv_obj_t* panel_model = nullptr;
+static lv_obj_t* bar_model;
+static lv_obj_t* lbl_model_pct;
+static lv_obj_t* lbl_model_label;
+static lv_obj_t* lbl_model_reset;
+static lv_obj_t* lbl_month = nullptr;
 // Enterprise-only widgets inside panel_session
 static lv_obj_t* lbl_session_pct_sym = nullptr;  // "%" in smaller font
 static lv_obj_t* lbl_spending_desc = nullptr;     // "of your monthly budget"
@@ -414,6 +448,62 @@ static lv_obj_t* make_usage_panel(lv_obj_t* parent, int y, const char* pill_text
     return panel;
 }
 
+// Re-position and re-style one usage panel for the given geometry.
+static void layout_panel(lv_obj_t* panel, lv_obj_t* pct, lv_obj_t* pill,
+                         lv_obj_t* bar, lv_obj_t* reset, int y, const PanelGeom& g) {
+    lv_obj_set_y(panel, y);
+    lv_obj_set_height(panel, g.h);
+    lv_obj_set_style_pad_top(panel, g.pad_y, 0);
+    lv_obj_set_style_pad_bottom(panel, g.pad_y, 0);
+    lv_obj_set_style_text_font(pct, g.pct_font, 0);
+    lv_obj_set_style_text_font(pill, g.pill_font, 0);
+    lv_obj_set_style_pad_left(pill, g.pill_pad_x, 0);
+    lv_obj_set_style_pad_right(pill, g.pill_pad_x, 0);
+    lv_obj_set_style_pad_top(pill, g.pill_pad_y, 0);
+    lv_obj_set_style_pad_bottom(pill, g.pill_pad_y, 0);
+    lv_obj_set_y(bar, g.bar_y);
+    lv_obj_set_height(bar, g.bar_h);
+    lv_obj_set_style_text_font(reset, g.reset_font, 0);
+    lv_obj_set_y(reset, g.reset_y);
+}
+
+// Lay out the usage panels: roomy = the original two big panels; dense = three
+// slim slots (session, weekly, per-model) with the monthly line under the last
+// visible one. Hidden widgets keep their slot so nothing jumps between payloads.
+static void apply_usage_layout(bool dense, bool show_model, bool show_month) {
+    const PanelGeom& g = dense ? L.dense : L.roomy;
+    int y = L.content_y;
+    layout_panel(panel_session, lbl_session_pct, lbl_session_label,
+                 bar_session, lbl_session_reset, y, g);
+    y += g.h + g.gap;
+    layout_panel(panel_weekly, lbl_weekly_pct, lbl_weekly_label,
+                 bar_weekly, lbl_weekly_reset, y, g);
+    y += g.h + g.gap;
+    layout_panel(panel_model, lbl_model_pct, lbl_model_label,
+                 bar_model, lbl_model_reset, y, g);
+    if (dense && show_model) {
+        lv_obj_clear_flag(panel_model, LV_OBJ_FLAG_HIDDEN);
+        y += g.h + g.gap;
+    } else {
+        lv_obj_add_flag(panel_model, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (dense && show_month) {
+        lv_obj_set_style_text_font(lbl_month, L.month_font, 0);
+        lv_obj_align(lbl_month, LV_ALIGN_TOP_MID, 0, y - g.gap / 2);
+        lv_obj_clear_flag(lbl_month, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(lbl_month, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+// 1234 -> "1,234"; 1.5e6 -> "1.5M"; 2.34e9 -> "2.34B"
+static void format_tokens(double n, char* buf, size_t len) {
+    if (n < 1e4)       snprintf(buf, len, "%.0f", n);
+    else if (n < 1e6)  snprintf(buf, len, "%.0fK", n / 1e3);
+    else if (n < 1e9)  snprintf(buf, len, "%.1fM", n / 1e6);
+    else               snprintf(buf, len, "%.2fB", n / 1e9);
+}
+
 // Pairing hint — shown when disconnected so the screen isn't empty and the
 // user knows how to (re)pair. Wording matches the 3-second release gesture.
 static void build_pair_group(lv_obj_t* parent) {
@@ -529,6 +619,17 @@ static void init_usage_screen(lv_obj_t* scr) {
     // Recolor enabled so enterprise period box can color pace and reset separately
     lv_label_set_recolor(lbl_weekly_reset, true);
 
+    panel_model = make_usage_panel(usage_group, 0, "Model",
+                     &lbl_model_pct, &lbl_model_label,
+                     &bar_model, &lbl_model_reset);
+    lv_obj_add_flag(panel_model, LV_OBJ_FLAG_HIDDEN);   // until the daemon sends "m"
+
+    lbl_month = lv_label_create(usage_group);
+    lv_label_set_text(lbl_month, "");
+    lv_label_set_recolor(lbl_month, true);
+    lv_obj_set_style_text_color(lbl_month, COL_DIM, 0);
+    lv_obj_add_flag(lbl_month, LV_OBJ_FLAG_HIDDEN);     // until the daemon sends "mt"
+
     build_pair_group(usage_container);
     build_idle_group(usage_container);
 
@@ -609,6 +710,12 @@ void ui_update(const UsageData* data) {
 
     int s_pct = (int)(data->session_pct + 0.5f);
 
+    // Dense layout only for Pro/Max payloads that carry an extra; Enterprise
+    // keeps its own roomy spending/period boxes.
+    bool show_model = !data->enterprise && data->has_model;
+    bool show_month = !data->enterprise && data->has_month;
+    apply_usage_layout(show_model || show_month, show_model, show_month);
+
     if (data->enterprise) {
         // Spending box: big number-only label + small "%" symbol + desc + pace
         lv_obj_set_style_text_font(lbl_session_pct, L.ent_pct_font, 0);
@@ -619,7 +726,6 @@ void ui_update(const UsageData* data) {
         lv_obj_add_flag(lbl_spending_status,   LV_OBJ_FLAG_HIDDEN);
         if (panel_weekly) lv_obj_clear_flag(panel_weekly, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_set_style_text_font(lbl_session_pct, L.pct_font, 0);
         lv_label_set_text(lbl_session_label, "Current");
         lv_obj_clear_flag(lbl_session_reset, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(lbl_session_pct_sym, LV_OBJ_FLAG_HIDDEN);
@@ -672,6 +778,28 @@ void ui_update(const UsageData* data) {
         lv_obj_set_style_bg_color(bar_weekly, pct_color(data->weekly_pct), LV_PART_INDICATOR);
         format_reset_time(data->weekly_reset_mins, buf, sizeof(buf));
         lv_label_set_text(lbl_weekly_reset, buf);
+    }
+
+    if (show_model) {
+        int m_pct = (int)(data->model_pct + 0.5f);
+        lv_label_set_text(lbl_model_label, data->model_label);
+        lv_label_set_text_fmt(lbl_model_pct, "%d%%", m_pct);
+        lv_bar_set_value(bar_model, m_pct, LV_ANIM_ON);
+        lv_obj_set_style_bg_color(bar_model, pct_color(data->model_pct), LV_PART_INDICATOR);
+        format_reset_time(data->model_reset_mins, buf, sizeof(buf));
+        lv_label_set_text(lbl_model_reset, buf);
+    }
+
+    if (show_month) {
+        char tok[16];
+        format_tokens(data->month_tokens, tok, sizeof(tok));
+        char line[80];
+        // Cents only while they matter: "$21.04", "$1094"
+        snprintf(line, sizeof(line), data->month_cost < 1000.0f
+                     ? "This month  #faf9f5 %s# tokens  #faf9f5 $%.2f#"
+                     : "This month  #faf9f5 %s# tokens  #faf9f5 $%.0f#",
+                 tok, data->month_cost);
+        lv_label_set_text(lbl_month, line);
     }
 }
 

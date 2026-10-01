@@ -24,6 +24,11 @@ import httpx
 from bleak import BleakClient
 from bleak.exc import BleakError
 
+try:  # imported as daemon.claude_usage_daemon (tests) or run as a script
+    from daemon import usage_extras
+except ImportError:
+    import usage_extras
+
 DEVICE_NAME = "Clawdmeter"
 SERVICE_UUID = "4c41555a-4465-7669-6365-000000000001"
 RX_CHAR_UUID = "4c41555a-4465-7669-6365-000000000002"
@@ -556,6 +561,7 @@ async def poll_active(selector: PlanSelector = _SELECTOR) -> tuple[dict | None, 
     dirs = read_config_dirs()
     payloads: dict[Path, dict] = {}
     sessions: dict[Path, int] = {}
+    tokens: dict[Path, str] = {}
     any_live = False
     for d in dirs:
         token = read_token_for(d)
@@ -573,12 +579,45 @@ async def poll_active(selector: PlanSelector = _SELECTOR) -> tuple[dict | None, 
         if payload is not None:
             payloads[d] = payload
             sessions[d] = int(payload.get("s", 0) or 0)
+            tokens[d] = token
     if not payloads:
         return None, not any_live
     active = selector.choose(sessions)
     if len(dirs) > 1:
         log(f"Active plan: {active} (s={sessions[active]})")
-    return payloads[active], False
+    payload = payloads[active]
+    await add_extra_fields(payload, tokens[active], dirs)
+    return payload, False
+
+
+_MONTHLY = usage_extras.MonthlyUsage()
+
+
+async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
+    """Add the per-model weekly limit (m/mr/ml) and this month's tokens + API
+    cost (mt/mc). Each is best-effort: a failure just omits its keys, and the
+    device hides the matching widgets.
+
+    Config (~/.config/claude-usage-monitor/config):
+      model_limit = fable    # weekly bucket to show as the third bar; off = hide
+      monthly     = on       # monthly tokens + cost from local transcripts; off = hide
+    """
+    if payload.get("acct") != "pro":
+        return  # Enterprise accounts have no per-model weekly buckets
+    settings = usage_extras.read_settings(CONFIG_FILE)
+    wanted = usage_extras.env_or(settings, "model_limit", "fable")
+    if not usage_extras.is_off(wanted):
+        payload.update(await usage_extras.fetch_model_limit(
+            token, wanted, usage_extras.label_for(wanted),
+            API_HEADERS_TEMPLATE["User-Agent"]))
+    if not usage_extras.is_off(usage_extras.env_or(settings, "monthly", "on")):
+        try:
+            mt, mc = await asyncio.to_thread(_MONTHLY.totals, dirs)
+        except Exception as e:  # never let stats break the usage poll
+            log(f"Monthly usage scan failed: {e}")
+        else:
+            payload["mt"] = mt
+            payload["mc"] = round(mc, 2)
 
 
 async def poll_active_payload(selector: PlanSelector = _SELECTOR) -> dict | None:

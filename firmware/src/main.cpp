@@ -119,6 +119,14 @@ static bool parse_json(const char* json, UsageData* out) {
     strlcpy(out->reset_date, doc["rd"] | "", sizeof(out->reset_date));
     out->clock_epoch = doc["t"] | 0L;
     out->clock_fmt = doc["tf"] | 24;
+    // Optional extras — absent keys hide the matching widgets.
+    out->has_model = !doc["m"].isNull();
+    out->model_pct = doc["m"] | 0.0f;
+    out->model_reset_mins = doc["mr"] | -1;
+    strlcpy(out->model_label, doc["ml"] | "Model", sizeof(out->model_label));
+    out->has_month = !doc["mt"].isNull();
+    out->month_tokens = doc["mt"] | 0.0;
+    out->month_cost = doc["mc"] | 0.0f;
     out->ok = doc["ok"] | false;
     out->valid = true;
     return true;
