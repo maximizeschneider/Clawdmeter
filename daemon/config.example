@@ -42,3 +42,29 @@ chime = off
 #   12   = show the clock, forced 12-hour  (e.g. 6:28 PM)
 #   24   = show the clock, forced 24-hour  (e.g. 18:28)
 clock = off
+
+# Third bar on the Usage screen: a per-model weekly limit, read from the same
+# endpoint Claude Code's /usage screen uses (macOS daemon).
+#   fable = show the Fable weekly limit (default)
+#   off   = hide the third bar
+# Any other model word or exact bucket key works too (e.g. opus, seven_day_opus).
+# If nothing matches, the daemon log lists the buckets your account reports.
+# model_limit = fable
+
+# "This month" line on the Usage screen: tokens and API-equivalent cost summed
+# from Claude Code's session logs on this machine (<config dir>/projects).
+# Cost is tokens x Anthropic API list prices, the same figure Claude Code shows
+# per session — not what your subscription bills. (macOS daemon)
+#   on  = show it (default)
+#   off = hide it
+# monthly = on
+
+# Token prices for the "This month" cost, in USD per million tokens:
+#   price.<model> = input, output, cache_read
+# Cache writes are derived from the input price (1.25x for 5-minute, 2x for
+# 1-hour caching). <model> is any part of the model id; the longest match wins,
+# so "opus-5-5" beats "opus-5". Lines here override the built-in table in
+# daemon/usage_extras.py, or add models it doesn't know. Takes effect on the
+# next poll, and re-prices the whole current month.
+# price.fable-5-1 = 10, 50, 0.25
+# price.opus-5-5  = 4, 20, 0.20
