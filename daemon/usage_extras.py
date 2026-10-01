@@ -27,57 +27,89 @@ import httpx
 OAUTH_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 
 # USD per million tokens: (input, output, cache read). Cache writes are priced
-# off input: 1.25x for the 5-minute TTL, 2x for the 1-hour TTL. Matched by
-# substring against the transcript's model id, first match wins, so more
-# specific ids come before their family prefix.
-PRICES: list[tuple[str, tuple[float, float, float]]] = [
-    ("fable-5-1",  (10.0, 50.0, 0.25)),
-    ("mythos-5-1", (10.0, 50.0, 0.25)),
-    ("fable",      (10.0, 50.0, 1.00)),
-    ("mythos",     (10.0, 50.0, 1.00)),
-    ("opus-5-5",   (4.0, 20.0, 0.20)),
-    ("opus-5",     (5.0, 25.0, 0.50)),
-    ("opus-4-8",   (5.0, 25.0, 0.50)),
-    ("opus-4-7",   (5.0, 25.0, 0.50)),
-    ("opus-4-6",   (5.0, 25.0, 0.50)),
-    ("opus-4-5",   (5.0, 25.0, 0.50)),
-    ("opus-4",     (15.0, 75.0, 1.50)),   # Opus 4 / 4.1
-    ("sonnet-5",   (2.0, 10.0, 0.20)),    # Sonnet 5 / 5.5
-    ("sonnet-4",   (3.0, 15.0, 0.30)),    # Sonnet 4 / 4.5 / 4.6
-    ("haiku-4",    (1.0, 5.0, 0.10)),
-    ("haiku-3-5",  (0.8, 4.0, 0.08)),
-]
+# off input: 1.25x for the 5-minute TTL, 2x for the 1-hour TTL. A row applies
+# to every model id containing its key; the longest matching key wins, so
+# "opus-5-5" beats "opus-5" regardless of order. `price.<key> = in, out, read`
+# lines in the daemon config override or extend this table (see
+# parse_price_overrides), so a price change needs no code edit or restart.
+Price = tuple[float, float, float]
+PRICES: dict[str, Price] = {
+    "fable-5-1":  (10.0, 50.0, 0.25),
+    "mythos-5-1": (10.0, 50.0, 0.25),
+    "fable":      (10.0, 50.0, 1.00),   # Fable 5
+    "mythos":     (10.0, 50.0, 1.00),   # Mythos 5
+    "opus-5-5":   (4.0, 20.0, 0.20),
+    "opus-5":     (5.0, 25.0, 0.50),
+    "opus-4-8":   (5.0, 25.0, 0.50),
+    "opus-4-7":   (5.0, 25.0, 0.50),
+    "opus-4-6":   (5.0, 25.0, 0.50),
+    "opus-4-5":   (5.0, 25.0, 0.50),
+    "opus-4":     (15.0, 75.0, 1.50),   # Opus 4 / 4.1
+    "sonnet-5":   (2.0, 10.0, 0.20),    # Sonnet 5 / 5.5
+    "sonnet-4":   (3.0, 15.0, 0.30),    # Sonnet 4 / 4.5 / 4.6
+    "haiku-4":    (1.0, 5.0, 0.10),     # Haiku 4.5
+    "haiku-3-5":  (0.8, 4.0, 0.08),
+}
 
 
-def price_for(model: str) -> tuple[float, float, float] | None:
+def parse_price_overrides(settings: dict[str, str]) -> dict[str, Price]:
+    """`price.<model key> = input, output, cache_read` config lines (USD per
+    million tokens). Malformed lines are logged and skipped."""
+    out: dict[str, Price] = {}
+    for key, val in settings.items():
+        if not key.startswith("price."):
+            continue
+        name = key[len("price."):].strip()
+        try:
+            nums = tuple(float(x) for x in val.replace(" ", "").split(","))
+        except ValueError:
+            nums = ()
+        if not name or len(nums) != 3 or min(nums) < 0:
+            print(f"[usage_extras] ignoring config line {key} = {val!r}; "
+                  "expected: input, output, cache_read", flush=True)
+            continue
+        out[name] = nums  # type: ignore[assignment]
+    return out
+
+
+def price_for(model: str, overrides: dict[str, Price] | None = None) -> Price | None:
+    """Price row for a model id: the longest key it contains, config overrides
+    winning over built-ins on an equal-length match."""
     m = model.lower()
-    for key, price in PRICES:
-        if key in m:
-            return price
-    return None
+    best: tuple[int, int, Price] | None = None
+    for prio, table in ((0, PRICES), (1, overrides or {})):
+        for key, price in table.items():
+            if key in m and (best is None or (len(key), prio) > best[:2]):
+                best = (len(key), prio, price)
+    return best[2] if best else None
 
 
-def usage_cost(model: str, usage: dict) -> float:
-    """API-equivalent USD cost of one assistant message's `usage` block."""
-    price = price_for(model)
-    if price is None:
-        return 0.0
-    p_in, p_out, p_read = price
-    inp = usage.get("input_tokens") or 0
-    out = usage.get("output_tokens") or 0
-    read = usage.get("cache_read_input_tokens") or 0
+# Per-message token counts: (input, output, cache read, 5m write, 1h write)
+Counts = tuple[int, int, int, int, int]
+
+
+def usage_counts(usage: dict) -> Counts:
     write = usage.get("cache_creation_input_tokens") or 0
     split = usage.get("cache_creation") or {}
     w1h = split.get("ephemeral_1h_input_tokens") or 0
-    w5m = max(write - w1h, 0)  # no split reported -> treat all writes as 5m
+    return (usage.get("input_tokens") or 0,
+            usage.get("output_tokens") or 0,
+            usage.get("cache_read_input_tokens") or 0,
+            max(write - w1h, 0),  # no split reported -> treat all writes as 5m
+            w1h)
+
+
+def counts_cost(price: Price, c: Counts) -> float:
+    p_in, p_out, p_read = price
+    inp, out, read, w5m, w1h = c
     return (inp * p_in + out * p_out + read * p_read
             + w5m * p_in * 1.25 + w1h * p_in * 2.0) / 1_000_000
 
 
-def _usage_tokens(usage: dict) -> int:
-    return sum(usage.get(k) or 0 for k in (
-        "input_tokens", "output_tokens",
-        "cache_creation_input_tokens", "cache_read_input_tokens"))
+def usage_cost(model: str, usage: dict, overrides: dict[str, Price] | None = None) -> float:
+    """API-equivalent USD cost of one assistant message's `usage` block."""
+    price = price_for(model, overrides)
+    return counts_cost(price, usage_counts(usage)) if price else 0.0
 
 
 class MonthlyUsage:
@@ -86,16 +118,18 @@ class MonthlyUsage:
     Re-parses only files whose size/mtime changed since the last call, so the
     per-poll cost stays small once the cache is warm. Assistant messages are
     de-duplicated by message id + request id: Claude Code writes one line per
-    content block, each repeating the same usage block.
+    content block, each repeating the same usage block. Token counts are cached
+    per message and priced on every call, so a price change applies at once.
     """
 
     def __init__(self) -> None:
-        # path -> (mtime, size, {month: {dedup_key: (tokens, cost)}})
-        self._files: dict[Path, tuple[float, int, dict[str, dict[str, tuple[int, float]]]]] = {}
+        # path -> (mtime, size, {month: {dedup_key: (model, counts)}})
+        self._files: dict[Path, tuple[float, int, dict[str, dict[str, tuple[str, Counts]]]]] = {}
         self._unknown_models: set[str] = set()
 
-    def _parse(self, path: Path) -> dict[str, dict[str, tuple[int, float]]]:
-        months: dict[str, dict[str, tuple[int, float]]] = {}
+    @staticmethod
+    def _parse(path: Path) -> dict[str, dict[str, tuple[str, Counts]]]:
+        months: dict[str, dict[str, tuple[str, Counts]]] = {}
         try:
             fh = path.open("r", encoding="utf-8", errors="replace")
         except OSError:
@@ -124,21 +158,16 @@ class MonthlyUsage:
                 key = f"{msg.get('id')}:{rec.get('requestId')}"
                 if msg.get("id") is None:
                     key = f"{rec.get('uuid')}"
-                if price_for(model) is None and model not in self._unknown_models:
-                    self._unknown_models.add(model)
-                    print(f"[usage_extras] no price for model {model!r}; "
-                          "its tokens count but add $0", flush=True)
-                months.setdefault(month, {})[key] = (
-                    _usage_tokens(usage), usage_cost(model, usage))
+                months.setdefault(month, {})[key] = (model, usage_counts(usage))
         return months
 
-    def totals(self, config_dirs: list[Path], now: datetime.datetime | None = None
-               ) -> tuple[int, float]:
+    def totals(self, config_dirs: list[Path], now: datetime.datetime | None = None,
+               overrides: dict[str, Price] | None = None) -> tuple[int, float]:
         now = now or datetime.datetime.now().astimezone()
         month = now.strftime("%Y-%m")
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
         seen: set[Path] = set()
-        merged: dict[str, tuple[int, float]] = {}
+        merged: dict[str, tuple[str, Counts]] = {}
         for d in config_dirs:
             root = d / "projects"
             if not root.is_dir():
@@ -158,8 +187,20 @@ class MonthlyUsage:
                 merged.update(cached[2].get(month, {}))
         for gone in set(self._files) - seen:
             del self._files[gone]
-        tokens = sum(t for t, _ in merged.values())
-        cost = sum(c for _, c in merged.values())
+        tokens = 0
+        cost = 0.0
+        prices: dict[str, Price | None] = {}
+        for model, counts in merged.values():
+            tokens += sum(counts)
+            if model not in prices:
+                prices[model] = price_for(model, overrides)
+                if prices[model] is None and model not in self._unknown_models:
+                    self._unknown_models.add(model)
+                    print(f"[usage_extras] no price for model {model!r}; its tokens "
+                          "count but add $0 (add a price.<model> line to the config)",
+                          flush=True)
+            if prices[model]:
+                cost += counts_cost(prices[model], counts)
         return tokens, cost
 
 

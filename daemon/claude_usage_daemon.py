@@ -601,6 +601,7 @@ async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
     Config (~/.config/claude-usage-monitor/config):
       model_limit = fable    # weekly bucket to show as the third bar; off = hide
       monthly     = on       # monthly tokens + cost from local transcripts; off = hide
+      price.<model> = in, out, cache_read   # USD/M tokens, overrides built-in prices
     """
     if payload.get("acct") != "pro":
         return  # Enterprise accounts have no per-model weekly buckets
@@ -612,7 +613,9 @@ async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
             API_HEADERS_TEMPLATE["User-Agent"]))
     if not usage_extras.is_off(usage_extras.env_or(settings, "monthly", "on")):
         try:
-            mt, mc = await asyncio.to_thread(_MONTHLY.totals, dirs)
+            mt, mc = await asyncio.to_thread(
+                _MONTHLY.totals, dirs, None,
+                usage_extras.parse_price_overrides(settings))
         except Exception as e:  # never let stats break the usage poll
             log(f"Monthly usage scan failed: {e}")
         else:

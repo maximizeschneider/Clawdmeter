@@ -115,7 +115,7 @@ def test_add_extra_fields_respects_config(tmp_path, monkeypatch):
         return {"m": 61, "mr": 100, "ml": label}
 
     monkeypatch.setattr(ux, "fetch_model_limit", fake_fetch)
-    monkeypatch.setattr(d._MONTHLY, "totals", lambda dirs: (1234, 5.678))
+    monkeypatch.setattr(d._MONTHLY, "totals", lambda dirs, now, overrides: (1234, 5.678))
     cfg = tmp_path / "config"
     monkeypatch.setattr(d, "CONFIG_FILE", cfg)
 
@@ -176,3 +176,34 @@ def test_model_limit_survives_one_failed_fetch(monkeypatch):
     monkeypatch.setattr(ux, "_last", (time.time() - ux.STALE_OK_S - 1, ok))
     replies.append(Resp(500))
     assert asyncio.run(ux.fetch_model_limit("t", "fable", "Fable", "ua")) == {}
+
+
+def test_price_overrides_from_config():
+    """`price.<key> = in, out, read` lines override built-ins, add new models,
+    and skip malformed values."""
+    o = ux.parse_price_overrides({
+        "price.opus-5-5": "3, 15, 0.15",
+        "price.claude-nova-1": "7,35,0.7",
+        "price.broken": "1, 2",
+        "price.neg": "-1, 2, 3",
+        "monthly": "on",
+    })
+    assert o == {"opus-5-5": (3.0, 15.0, 0.15), "claude-nova-1": (7.0, 35.0, 0.7)}
+    assert ux.price_for("claude-opus-5-5", o) == (3.0, 15.0, 0.15)
+    assert ux.price_for("claude-nova-1", o) == (7.0, 35.0, 0.7)
+    # A short override doesn't shadow a longer, more specific built-in row
+    assert ux.price_for("claude-opus-5-5", {"opus": (1.0, 1.0, 1.0)}) == (4.0, 20.0, 0.20)
+    assert ux.price_for("claude-opus-4-1", {"opus": (1.0, 1.0, 1.0)}) == (15.0, 75.0, 1.50)
+
+
+def test_price_change_applies_without_reparsing(tmp_path):
+    proj = tmp_path / "projects" / "p"
+    proj.mkdir(parents=True)
+    now = datetime.datetime.now().astimezone()
+    ts = now.astimezone(datetime.timezone.utc).isoformat()
+    (proj / "s.jsonl").write_text(
+        _assistant("a", "r", ts, "claude-opus-5-5", input_tokens=1_000_000) + "\n")
+    mu = ux.MonthlyUsage()
+    assert abs(mu.totals([tmp_path], now=now)[1] - 4.0) < 1e-9
+    cheaper = {"opus-5-5": (2.0, 10.0, 0.1)}
+    assert abs(mu.totals([tmp_path], now=now, overrides=cheaper)[1] - 2.0) < 1e-9
