@@ -248,3 +248,55 @@ def test_user_agent_reports_installed_claude_version(tmp_path, monkeypatch):
     monkeypatch.setattr(ux, "_CLAUDE_CANDIDATES", ())
     monkeypatch.setattr(ux, "_ua_cache", None)
     assert ux.claude_code_user_agent() == f"claude-code/{ux.FALLBACK_CLAUDE_VERSION}"
+
+
+# Shape of /api/oauth/usage as returned to Claude Code 2.1.299 (Oct 2026):
+# the Fable limit is a "weekly_scoped" entry in "limits", not a top-level key.
+REAL_USAGE = {
+    "five_hour": {"utilization": 30.0, "resets_at": "2026-10-14T11:00:00+00:00"},
+    "seven_day": {"utilization": 59.0, "resets_at": "2026-10-15T09:00:00+00:00"},
+    "iguana_necktie": {"utilization": 100.0, "resets_at": "2026-11-05T07:59:00+00:00"},
+    "seven_day_opus": None,
+    "limits": [
+        {"kind": "session", "percent": 30, "scope": None},
+        {"kind": "weekly_all", "percent": 59, "scope": None},
+        {"kind": "weekly_scoped", "group": "weekly", "percent": 31,
+         "resets_at": "2026-10-15T08:59:59.634118+00:00",
+         "scope": {"model": {"id": None, "display_name": "Fable"}, "surface": None}},
+    ],
+}
+
+
+def test_fable_found_in_limits_list():
+    name, bucket = ux.pick_model_limit(REAL_USAGE, "fable")
+    assert name == "Fable"
+    assert bucket == {"utilization": 31, "resets_at": "2026-10-15T08:59:59.634118+00:00"}
+    assert ux.pick_model_limit(REAL_USAGE, "sonnet") is None
+    assert ux.available_limits(REAL_USAGE) == ["Fable"]
+
+
+def test_fetch_model_limit_reads_fable_from_limits(monkeypatch):
+    import asyncio
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return REAL_USAGE
+
+    class Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, *a, **k):
+            return Resp()
+
+    monkeypatch.setattr(ux.httpx, "AsyncClient", Client)
+    out = asyncio.run(ux.fetch_model_limit("t", "fable", "Fable", "ua"))
+    assert out["m"] == 31 and out["ml"] == "Fable" and out["mr"] >= 0

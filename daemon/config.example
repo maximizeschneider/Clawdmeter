@@ -47,8 +47,10 @@ clock = off
 # endpoint Claude Code's /usage screen uses (macOS daemon).
 #   fable = show the Fable weekly limit (default)
 #   off   = hide the third bar
-# Any other model word or exact bucket key works too (e.g. opus, seven_day_opus).
-# If nothing matches, the daemon log lists the buckets your account reports.
+# Any other model with its own weekly limit works too: the name is matched
+# against the per-model limits /usage shows (e.g. fable, opus), or an exact
+# bucket key like seven_day_opus. If nothing matches, the daemon log lists
+# the names your account reports.
 # model_limit = fable
 
 # Text on that bar's label (max 11 characters). Defaults to a name derived
