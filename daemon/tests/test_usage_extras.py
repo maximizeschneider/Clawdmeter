@@ -111,7 +111,7 @@ def test_add_extra_fields_respects_config(tmp_path, monkeypatch):
     import asyncio
     import daemon.claude_usage_daemon as d
 
-    async def fake_fetch(token, wanted, label, ua):
+    async def fake_fetch(token, wanted, label, ua=None):
         return {"m": 61, "mr": 100, "ml": label}
 
     monkeypatch.setattr(ux, "fetch_model_limit", fake_fetch)
@@ -207,3 +207,96 @@ def test_price_change_applies_without_reparsing(tmp_path):
     assert abs(mu.totals([tmp_path], now=now)[1] - 4.0) < 1e-9
     cheaper = {"opus-5-5": (2.0, 10.0, 0.1)}
     assert abs(mu.totals([tmp_path], now=now, overrides=cheaper)[1] - 2.0) < 1e-9
+
+
+def test_model_label_config_overrides_derived_label(tmp_path, monkeypatch):
+    """`model_label` names the bar when model_limit is an internal bucket key."""
+    import asyncio
+    import daemon.claude_usage_daemon as d
+    seen = {}
+
+    async def fake_fetch(token, wanted, label, ua=None):
+        seen["wanted"], seen["label"] = wanted, label
+        return {}
+
+    monkeypatch.setattr(ux, "fetch_model_limit", fake_fetch)
+    cfg = tmp_path / "config"
+    cfg.write_text("model_limit = iguana_necktie\nmodel_label = Fable\nmonthly = off\n")
+    monkeypatch.setattr(d, "CONFIG_FILE", cfg)
+    asyncio.run(d.add_extra_fields({"acct": "pro"}, "tok", [tmp_path]))
+    assert seen == {"wanted": "iguana_necktie", "label": "Fable"}
+
+
+def test_dollar_bucket_is_picked_by_exact_key():
+    """Spend-limit buckets (limit_dollars etc.) still carry utilization/resets_at."""
+    usage = {"iguana_necktie": {"utilization": 100.0, "resets_at": "2026-11-05T07:59:00+00:00",
+                                "limit_dollars": 250, "used_dollars": 250.1}}
+    assert ux.pick_model_limit(usage, "iguana_necktie")[0] == "iguana_necktie"
+
+
+def test_user_agent_reports_installed_claude_version(tmp_path, monkeypatch):
+    """The usage endpoint gates per-model buckets on the client version, so the
+    UA carries the installed CLI's version, with a fallback when it's missing."""
+    fake = tmp_path / "claude"
+    fake.write_text("#!/bin/sh\necho '2.1.400 (Claude Code)'\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr(ux.shutil, "which", lambda name: str(fake))
+    monkeypatch.setattr(ux, "_ua_cache", None)
+    assert ux.claude_code_user_agent() == "claude-code/2.1.400"
+
+    monkeypatch.setattr(ux.shutil, "which", lambda name: None)
+    monkeypatch.setattr(ux, "_CLAUDE_CANDIDATES", ())
+    monkeypatch.setattr(ux, "_ua_cache", None)
+    assert ux.claude_code_user_agent() == f"claude-code/{ux.FALLBACK_CLAUDE_VERSION}"
+
+
+# Shape of /api/oauth/usage as returned to Claude Code 2.1.299 (Oct 2026):
+# the Fable limit is a "weekly_scoped" entry in "limits", not a top-level key.
+REAL_USAGE = {
+    "five_hour": {"utilization": 30.0, "resets_at": "2026-10-14T11:00:00+00:00"},
+    "seven_day": {"utilization": 59.0, "resets_at": "2026-10-15T09:00:00+00:00"},
+    "iguana_necktie": {"utilization": 100.0, "resets_at": "2026-11-05T07:59:00+00:00"},
+    "seven_day_opus": None,
+    "limits": [
+        {"kind": "session", "percent": 30, "scope": None},
+        {"kind": "weekly_all", "percent": 59, "scope": None},
+        {"kind": "weekly_scoped", "group": "weekly", "percent": 31,
+         "resets_at": "2026-10-15T08:59:59.634118+00:00",
+         "scope": {"model": {"id": None, "display_name": "Fable"}, "surface": None}},
+    ],
+}
+
+
+def test_fable_found_in_limits_list():
+    name, bucket = ux.pick_model_limit(REAL_USAGE, "fable")
+    assert name == "Fable"
+    assert bucket == {"utilization": 31, "resets_at": "2026-10-15T08:59:59.634118+00:00"}
+    assert ux.pick_model_limit(REAL_USAGE, "sonnet") is None
+    assert ux.available_limits(REAL_USAGE) == ["Fable"]
+
+
+def test_fetch_model_limit_reads_fable_from_limits(monkeypatch):
+    import asyncio
+
+    class Resp:
+        status_code = 200
+
+        def json(self):
+            return REAL_USAGE
+
+    class Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, *a, **k):
+            return Resp()
+
+    monkeypatch.setattr(ux.httpx, "AsyncClient", Client)
+    out = asyncio.run(ux.fetch_model_limit("t", "fable", "Fable", "ua"))
+    assert out["m"] == 31 and out["ml"] == "Fable" and out["mr"] >= 0

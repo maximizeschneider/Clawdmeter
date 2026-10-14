@@ -20,11 +20,49 @@ import datetime
 import json
 import os
 import re
+import shutil
+import subprocess
+import time
 from pathlib import Path
 
 import httpx
 
 OAUTH_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+
+# The usage endpoint only returns per-model weekly buckets to recent Claude
+# Code versions, so report the installed CLI's version (re-checked hourly, it
+# auto-updates). Fallback when the CLI can't be found, e.g. under launchd's
+# minimal PATH with no known install location.
+FALLBACK_CLAUDE_VERSION = "2.1.299"
+_CLAUDE_CANDIDATES = (
+    "~/.local/bin/claude", "~/.claude/local/claude",
+    "/opt/homebrew/bin/claude", "/usr/local/bin/claude",
+)
+_ua_cache: tuple[float, str] | None = None
+
+
+def claude_code_user_agent() -> str:
+    """"claude-code/<installed version>", cached for an hour."""
+    global _ua_cache
+    now = time.monotonic()
+    if _ua_cache and now - _ua_cache[0] < 3600:
+        return _ua_cache[1]
+    version = FALLBACK_CLAUDE_VERSION
+    paths = [shutil.which("claude")] + [os.path.expanduser(c) for c in _CLAUDE_CANDIDATES]
+    for exe in paths:
+        if not exe or not os.access(exe, os.X_OK):
+            continue
+        try:
+            out = subprocess.run([exe, "--version"], capture_output=True,
+                                 text=True, timeout=10).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        m = re.match(r"\s*(\d+\.\d+\.\d+)", out)
+        if m:
+            version = m.group(1)
+            break
+    _ua_cache = (now, f"claude-code/{version}")
+    return _ua_cache[1]
 
 # USD per million tokens: (input, output, cache read). Cache writes are priced
 # off input: 1.25x for the 5-minute TTL, 2x for the 1-hour TTL. A row applies
@@ -215,21 +253,47 @@ def _reset_minutes(resets_at, now: datetime.datetime) -> int:
     return int(round(mins)) if mins > 0 else 0
 
 
-def pick_model_limit(usage: dict, wanted: str) -> tuple[str, dict] | None:
-    """Find the per-model weekly bucket in an /api/oauth/usage response.
+def _scoped_model_names(entry: dict) -> list[str]:
+    model = ((entry.get("scope") or {}).get("model") or {})
+    return [str(n) for n in (model.get("display_name"), model.get("id")) if n]
 
-    `wanted` is either an exact key (e.g. "seven_day_fable") or a model word
-    ("fable") matched against keys that start with "seven_day_".
+
+def pick_model_limit(usage: dict, wanted: str) -> tuple[str, dict] | None:
+    """Find the per-model weekly limit in an /api/oauth/usage response.
+
+    Returns (name, {"utilization": 0-100, "resets_at": iso}). Looks in order:
+      1. an exact top-level key (e.g. "seven_day_opus", or an internal name)
+      2. the "limits" list: a "weekly_scoped" entry whose scope.model display
+         name or id contains `wanted` -- this is where Fable lives
+      3. top-level "seven_day_*" keys containing `wanted`
     """
     if not isinstance(usage, dict):
         return None
     if isinstance(usage.get(wanted), dict):
         return wanted, usage[wanted]
     w = wanted.lower()
+    for entry in usage.get("limits") or []:
+        if not isinstance(entry, dict) or entry.get("kind") != "weekly_scoped":
+            continue
+        names = _scoped_model_names(entry)
+        if any(w in n.lower() for n in names):
+            return names[0], {"utilization": entry.get("percent"),
+                              "resets_at": entry.get("resets_at")}
     for key, val in usage.items():
         if key.startswith("seven_day_") and w in key.lower() and isinstance(val, dict):
             return key, val
     return None
+
+
+def available_limits(usage: dict) -> list[str]:
+    """Names model_limit can match, for the 'no match' log line."""
+    if not isinstance(usage, dict):
+        return []
+    names = [n for e in usage.get("limits") or []
+             if isinstance(e, dict) and e.get("kind") == "weekly_scoped"
+             for n in _scoped_model_names(e)[:1]]
+    return names + sorted(k for k, v in usage.items()
+                          if k.startswith("seven_day_") and isinstance(v, dict))
 
 
 _logged_keys = False
@@ -252,7 +316,7 @@ def _fallback() -> dict:
 
 
 async def fetch_model_limit(token: str, wanted: str, label: str,
-                            user_agent: str) -> dict:
+                            user_agent: str | None = None) -> dict:
     """Payload fields {"m","mr","ml"} for the configured model's weekly limit,
     or {} when the endpoint doesn't report one (the device then hides the bar).
     """
@@ -260,7 +324,7 @@ async def fetch_model_limit(token: str, wanted: str, label: str,
     headers = {
         "Authorization": f"Bearer {token}",
         "anthropic-beta": "oauth-2025-04-20",
-        "User-Agent": user_agent,
+        "User-Agent": user_agent or claude_code_user_agent(),
     }
     try:
         async with httpx.AsyncClient(timeout=15.0) as http:
@@ -279,10 +343,9 @@ async def fetch_model_limit(token: str, wanted: str, label: str,
     if found is None:
         if not _logged_keys:
             _logged_keys = True
-            keys = sorted(k for k, v in data.items() if isinstance(v, dict)) \
-                if isinstance(data, dict) else []
             print(f"[usage_extras] no weekly limit matching {wanted!r}; "
-                  f"available: {keys} (set model_limit = <key> in the config)",
+                  f"available: {available_limits(data)} "
+                  "(set model_limit = <name> in the config)",
                   flush=True)
         return {}
     _key, bucket = found
