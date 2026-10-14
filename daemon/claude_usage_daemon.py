@@ -197,6 +197,19 @@ def read_token_for(config_dir: Path) -> str | None:
     return None
 
 
+def keychain_fallback_for(config_dir: Path, rejected: str) -> str | None:
+    """A second token to try when ``rejected`` (from read_token_for) got a 401.
+
+    On macOS a stale ``~/.claude/.credentials.json`` (left by an older Claude
+    Code) shadows the live Keychain entry the CLI actually keeps fresh, so for
+    the default dir retry with the Keychain token. Read-only, never a refresh.
+    """
+    if sys.platform != "darwin" or config_dir != DEFAULT_CONFIG_DIR:
+        return None
+    tok = _read_token_keychain()
+    return tok if tok and tok != rejected else None
+
+
 def load_cached_address() -> str | None:
     if not SAVED_ADDR_FILE.exists():
         return None
@@ -571,8 +584,17 @@ async def poll_active(selector: PlanSelector = _SELECTOR) -> tuple[dict | None, 
         try:
             payload = await poll_api(token)
         except TokenExpired:
-            log(f"Token in {d} expired/invalid; skipping")
-            continue
+            alt = keychain_fallback_for(d, token)
+            if alt is None:
+                log(f"Token in {d} expired/invalid; skipping")
+                continue
+            log(f"Token file in {d} is expired; using the Keychain login instead")
+            token = alt
+            try:
+                payload = await poll_api(token)
+            except TokenExpired:
+                log(f"Token in {d} expired/invalid; skipping")
+                continue
         # Authenticated: a transient None here isn't an auth failure, so the
         # dir counts as live and we stay silent rather than idling the device.
         any_live = True

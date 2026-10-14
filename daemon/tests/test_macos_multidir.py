@@ -199,3 +199,42 @@ def test_discover_target_non_darwin_returns_none_without_pin(monkeypatch):
     monkeypatch.setattr(mod.sys, "platform", "linux")
     monkeypatch.setattr(mod, "load_cached_address", lambda: None)
     assert _run(mod.discover_target()) is None
+
+
+# ---------------------------------------------------------------------------
+# A stale ~/.claude/.credentials.json must not shadow the live Keychain login
+# on macOS: when the file's token gets a 401, the default dir retries with the
+# Keychain token (read-only, no refresh).
+# ---------------------------------------------------------------------------
+
+def test_stale_file_falls_back_to_keychain_on_401(tmp_path, monkeypatch):
+    import asyncio
+    monkeypatch.setattr(mod, "DEFAULT_CONFIG_DIR", tmp_path)
+    monkeypatch.setattr(mod.sys, "platform", "darwin")
+    monkeypatch.setattr(mod, "read_config_dirs", lambda: [tmp_path])
+    (tmp_path / ".credentials.json").write_text('{"accessToken":"TOK_STALE"}')
+
+    async def fake_poll(token):
+        if token == "TOK_STALE":
+            raise mod.TokenExpired()
+        return {"s": 5, "w": 1, "ok": True}
+
+    async def no_extras(*a, **k):
+        return None
+
+    monkeypatch.setattr(mod, "poll_api", fake_poll)
+    monkeypatch.setattr(mod, "add_extra_fields", no_extras)
+    with patch.object(mod, "_read_token_keychain", return_value="TOK_LIVE"):
+        payload, dead = asyncio.run(mod.poll_active(mod.PlanSelector()))
+    assert payload == {"s": 5, "w": 1, "ok": True} and dead is False
+
+
+def test_no_keychain_fallback_off_macos_or_for_extra_dirs(tmp_path, monkeypatch):
+    monkeypatch.setattr(mod, "DEFAULT_CONFIG_DIR", tmp_path / "default")
+    monkeypatch.setattr(mod.sys, "platform", "darwin")
+    with patch.object(mod, "_read_token_keychain", return_value="TOK_LIVE"):
+        assert mod.keychain_fallback_for(tmp_path / "work", "X") is None
+        assert mod.keychain_fallback_for(tmp_path / "default", "TOK_LIVE") is None
+        assert mod.keychain_fallback_for(tmp_path / "default", "X") == "TOK_LIVE"
+    monkeypatch.setattr(mod.sys, "platform", "linux")
+    assert mod.keychain_fallback_for(tmp_path / "default", "X") is None
