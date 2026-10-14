@@ -51,6 +51,12 @@ clock = off
 # If nothing matches, the daemon log lists the buckets your account reports.
 # model_limit = fable
 
+# Text on that bar's label (max 11 characters). Defaults to a name derived
+# from model_limit, which reads oddly for internal bucket names, e.g.
+#   model_limit = iguana_necktie
+#   model_label = Fable
+# model_label = Fable
+
 # "This month" line on the Usage screen: tokens and API-equivalent cost summed
 # from Claude Code's session logs on this machine (<config dir>/projects).
 # Cost is tokens x Anthropic API list prices, the same figure Claude Code shows

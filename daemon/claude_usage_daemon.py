@@ -622,6 +622,7 @@ async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
 
     Config (~/.config/claude-usage-monitor/config):
       model_limit = fable    # weekly bucket to show as the third bar; off = hide
+      model_label = Fable    # pill text for that bar (default: derived from model_limit)
       monthly     = on       # monthly tokens + cost from local transcripts; off = hide
       price.<model> = in, out, cache_read   # USD/M tokens, overrides built-in prices
     """
@@ -631,7 +632,8 @@ async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
     wanted = usage_extras.env_or(settings, "model_limit", "fable")
     if not usage_extras.is_off(wanted):
         payload.update(await usage_extras.fetch_model_limit(
-            token, wanted, usage_extras.label_for(wanted),
+            token, wanted,
+            settings.get("model_label") or usage_extras.label_for(wanted),
             API_HEADERS_TEMPLATE["User-Agent"]))
     if not usage_extras.is_off(usage_extras.env_or(settings, "monthly", "on")):
         try:

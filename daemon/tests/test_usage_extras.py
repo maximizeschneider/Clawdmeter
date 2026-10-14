@@ -207,3 +207,28 @@ def test_price_change_applies_without_reparsing(tmp_path):
     assert abs(mu.totals([tmp_path], now=now)[1] - 4.0) < 1e-9
     cheaper = {"opus-5-5": (2.0, 10.0, 0.1)}
     assert abs(mu.totals([tmp_path], now=now, overrides=cheaper)[1] - 2.0) < 1e-9
+
+
+def test_model_label_config_overrides_derived_label(tmp_path, monkeypatch):
+    """`model_label` names the bar when model_limit is an internal bucket key."""
+    import asyncio
+    import daemon.claude_usage_daemon as d
+    seen = {}
+
+    async def fake_fetch(token, wanted, label, ua):
+        seen["wanted"], seen["label"] = wanted, label
+        return {}
+
+    monkeypatch.setattr(ux, "fetch_model_limit", fake_fetch)
+    cfg = tmp_path / "config"
+    cfg.write_text("model_limit = iguana_necktie\nmodel_label = Fable\nmonthly = off\n")
+    monkeypatch.setattr(d, "CONFIG_FILE", cfg)
+    asyncio.run(d.add_extra_fields({"acct": "pro"}, "tok", [tmp_path]))
+    assert seen == {"wanted": "iguana_necktie", "label": "Fable"}
+
+
+def test_dollar_bucket_is_picked_by_exact_key():
+    """Spend-limit buckets (limit_dollars etc.) still carry utilization/resets_at."""
+    usage = {"iguana_necktie": {"utilization": 100.0, "resets_at": "2026-11-05T07:59:00+00:00",
+                                "limit_dollars": 250, "used_dollars": 250.1}}
+    assert ux.pick_model_limit(usage, "iguana_necktie")[0] == "iguana_necktie"
