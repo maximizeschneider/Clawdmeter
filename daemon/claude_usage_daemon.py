@@ -633,8 +633,7 @@ async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
     if not usage_extras.is_off(wanted):
         payload.update(await usage_extras.fetch_model_limit(
             token, wanted,
-            settings.get("model_label") or usage_extras.label_for(wanted),
-            API_HEADERS_TEMPLATE["User-Agent"]))
+            settings.get("model_label") or usage_extras.label_for(wanted)))
     if not usage_extras.is_off(usage_extras.env_or(settings, "monthly", "on")):
         try:
             mt, mc = await asyncio.to_thread(

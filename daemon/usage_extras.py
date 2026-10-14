@@ -20,11 +20,49 @@ import datetime
 import json
 import os
 import re
+import shutil
+import subprocess
+import time
 from pathlib import Path
 
 import httpx
 
 OAUTH_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+
+# The usage endpoint only returns per-model weekly buckets to recent Claude
+# Code versions, so report the installed CLI's version (re-checked hourly, it
+# auto-updates). Fallback when the CLI can't be found, e.g. under launchd's
+# minimal PATH with no known install location.
+FALLBACK_CLAUDE_VERSION = "2.1.299"
+_CLAUDE_CANDIDATES = (
+    "~/.local/bin/claude", "~/.claude/local/claude",
+    "/opt/homebrew/bin/claude", "/usr/local/bin/claude",
+)
+_ua_cache: tuple[float, str] | None = None
+
+
+def claude_code_user_agent() -> str:
+    """"claude-code/<installed version>", cached for an hour."""
+    global _ua_cache
+    now = time.monotonic()
+    if _ua_cache and now - _ua_cache[0] < 3600:
+        return _ua_cache[1]
+    version = FALLBACK_CLAUDE_VERSION
+    paths = [shutil.which("claude")] + [os.path.expanduser(c) for c in _CLAUDE_CANDIDATES]
+    for exe in paths:
+        if not exe or not os.access(exe, os.X_OK):
+            continue
+        try:
+            out = subprocess.run([exe, "--version"], capture_output=True,
+                                 text=True, timeout=10).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        m = re.match(r"\s*(\d+\.\d+\.\d+)", out)
+        if m:
+            version = m.group(1)
+            break
+    _ua_cache = (now, f"claude-code/{version}")
+    return _ua_cache[1]
 
 # USD per million tokens: (input, output, cache read). Cache writes are priced
 # off input: 1.25x for the 5-minute TTL, 2x for the 1-hour TTL. A row applies
@@ -252,7 +290,7 @@ def _fallback() -> dict:
 
 
 async def fetch_model_limit(token: str, wanted: str, label: str,
-                            user_agent: str) -> dict:
+                            user_agent: str | None = None) -> dict:
     """Payload fields {"m","mr","ml"} for the configured model's weekly limit,
     or {} when the endpoint doesn't report one (the device then hides the bar).
     """
@@ -260,7 +298,7 @@ async def fetch_model_limit(token: str, wanted: str, label: str,
     headers = {
         "Authorization": f"Bearer {token}",
         "anthropic-beta": "oauth-2025-04-20",
-        "User-Agent": user_agent,
+        "User-Agent": user_agent or claude_code_user_agent(),
     }
     try:
         async with httpx.AsyncClient(timeout=15.0) as http:

@@ -111,7 +111,7 @@ def test_add_extra_fields_respects_config(tmp_path, monkeypatch):
     import asyncio
     import daemon.claude_usage_daemon as d
 
-    async def fake_fetch(token, wanted, label, ua):
+    async def fake_fetch(token, wanted, label, ua=None):
         return {"m": 61, "mr": 100, "ml": label}
 
     monkeypatch.setattr(ux, "fetch_model_limit", fake_fetch)
@@ -215,7 +215,7 @@ def test_model_label_config_overrides_derived_label(tmp_path, monkeypatch):
     import daemon.claude_usage_daemon as d
     seen = {}
 
-    async def fake_fetch(token, wanted, label, ua):
+    async def fake_fetch(token, wanted, label, ua=None):
         seen["wanted"], seen["label"] = wanted, label
         return {}
 
@@ -232,3 +232,19 @@ def test_dollar_bucket_is_picked_by_exact_key():
     usage = {"iguana_necktie": {"utilization": 100.0, "resets_at": "2026-11-05T07:59:00+00:00",
                                 "limit_dollars": 250, "used_dollars": 250.1}}
     assert ux.pick_model_limit(usage, "iguana_necktie")[0] == "iguana_necktie"
+
+
+def test_user_agent_reports_installed_claude_version(tmp_path, monkeypatch):
+    """The usage endpoint gates per-model buckets on the client version, so the
+    UA carries the installed CLI's version, with a fallback when it's missing."""
+    fake = tmp_path / "claude"
+    fake.write_text("#!/bin/sh\necho '2.1.400 (Claude Code)'\n")
+    fake.chmod(0o755)
+    monkeypatch.setattr(ux.shutil, "which", lambda name: str(fake))
+    monkeypatch.setattr(ux, "_ua_cache", None)
+    assert ux.claude_code_user_agent() == "claude-code/2.1.400"
+
+    monkeypatch.setattr(ux.shutil, "which", lambda name: None)
+    monkeypatch.setattr(ux, "_CLAUDE_CANDIDATES", ())
+    monkeypatch.setattr(ux, "_ua_cache", None)
+    assert ux.claude_code_user_agent() == f"claude-code/{ux.FALLBACK_CLAUDE_VERSION}"
