@@ -9,8 +9,8 @@
 // USB-C edge faces RIGHT, so the right-angle plug hides behind the control
 // panel, and its button edge faces LEFT, so the buttons are pressed through
 // the left side of the case. The firmware's IMU auto-rotation shows the
-// picture upright. The cable heads back from the plug and leaves through a
-// notch in the right side, near the back.
+// picture upright. The cable heads straight back from the plug and leaves
+// through the back cover, near its right edge.
 //
 // Board numbers are first guesses — measure your board and fix them before
 // printing (README.md). Print `part = "fit_test"` first.
@@ -69,7 +69,7 @@ win_extra  = 3;     // window bigger than active area, shows black glass corners
 win_r      = 5;     // TV-screen corner radius
 fit        = 0.4;
 clr        = 0.15;
-cable_d    = 5.6;   // cable exit notch
+cable_d    = 5.6;   // cable exit hole
 leg_len    = 13;    // front legs
 legs_inset = 9;
 
@@ -130,11 +130,11 @@ module button_holes() for (b = buttons) {
     translate([-1, yz[0], yz[1]]) rotate([0, 90, 0]) cylinder(d = btn_hole, h = x0);
 }
 
-module cable_cut()
-    hull() {
-        translate([W - wall - 1, D - 9, cable_z]) rotate([0, 90, 0]) cylinder(d = cable_d, h = wall + 2);
-        translate([W - wall - 1, D - eps, cable_z - cable_d / 2]) cube([wall + 2, 1, cable_d]);
-    }
+// Cable exit through the back, at plug height near the right edge. In the
+// cover it is a notch open to the cover's right edge, so the cover slides on
+// over an already-plugged cable; the body's back rim closes the notch.
+cable_x = W - 1.2 - cable_d / 2 - 0.2;
+module cable_cut() ycyl([cable_x, cable_z], cable_d, D - 6, D + 1);
 
 module body() {
     difference() {
@@ -178,8 +178,8 @@ module back_cover() difference() {
         }
     }
     for (i = [0 : 4]) xz_rrect([W / 2, H - 14 - i * 4.5], [W - 24, 2], 0.99, D - 3, D + 1);
-    hull() cable_cut();
-    translate([W - wall - 4, D - 8, cable_z - cable_d / 2 - 1]) cube([5, 9, cable_d + 2]);
+    cable_cut();
+    translate([cable_x, D - 8, cable_z - cable_d / 2]) cube([W, 9, cable_d]);
 }
 
 // ---- small parts ----
