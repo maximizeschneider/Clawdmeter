@@ -2,10 +2,14 @@
 
 A small 60s-style television for the Clawdmeter. The screen sits on the
 left behind a rounded TV window. On the right is a control panel with two
-knobs and a speaker grille. Splayed legs (the rear ones are shorter) lean
-the screen back 7°, and there are rabbit-ear antennas on top. The
-right-angle USB-C plug stays hidden inside, and the cable leaves through a
-notch low on the right side near the back.
+knobs and a speaker grille. It stands upright on four splayed legs, with
+rabbit-ear antennas on top. The right-angle USB-C plug stays hidden under
+the board with its cable heading back. Inside, the cable curves right and
+leaves through a notch low on the right side near the back.
+
+Size: 85 × 73 × 42 mm body. With legs it stands about 86 mm tall, or about
+120 mm to the antenna tips. Run `openscad -D 'part="dims"' -o x.stl retro_tv.scad`
+to print the numbers after you change parameters.
 
 | Front | Right side (buttons + cable exit) |
 |---|---|
@@ -40,7 +44,7 @@ All STLs come out already in print orientation:
 | `faceplate` | cream | Glue it into the front recess. This gives the two-tone look without a multi-colour printer. |
 | `back_cover` | walnut | Friction fit, with vents in the upper half. |
 | `knobs` | dark brown | Decorative, pinned with a 6 mm stub of 1.75 mm filament. |
-| `legs` | dark brown | 4 legs: the front pair is longer, which sets the tilt. Press-fit or glue. |
+| `legs` | dark brown | 4 legs, all the same length at `tilt = 0`. Press-fit or glue. |
 | `antenna` | grey | Dome + 2 rods. 2 mm metal rod or a bamboo skewer looks better than printed rods. |
 | `plungers` | any | One per side button. The long ones go through the right control panel. |
 
@@ -53,10 +57,13 @@ cream and dark-brown PLA all exist, so no painting is needed.
 2. Drop the plungers into the side holes from the inside.
 3. Push the board in from the back, glass first, until it snaps past the four
    clip posts.
-4. Plug in the right-angle USB-C. A sideways (left/right) elbow works best,
-   but a back-facing elbow fits too. Route the cable right, then back, and
-   out through the notch.
+4. Plug in the right-angle USB-C with the cable pointing toward the back of
+   the case. Ordinary L-shaped cables bend over the plug's flat side, so this
+   is the direction you get. Run the cable back, curve it right, and lay it
+   into the notch. `plug_room` (18 mm) is the space under the board. Measure
+   your plug from the metal tip to the far side of the plastic head, and raise
+   it if the head is longer than about 15 mm.
 5. Press the back cover on, then press in the legs and the antenna dome.
 
-The 7° tilt is set by `tilt` (and `leg_len`). The IMU auto-rotation still
-reads the screen as upright.
+`tilt` (default 0) shortens the rear legs to lean the screen back if you
+want that later.

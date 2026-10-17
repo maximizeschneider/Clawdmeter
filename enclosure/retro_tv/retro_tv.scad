@@ -2,9 +2,11 @@
 //
 // A small 60s/70s television: screen on the left behind a rounded TV window,
 // a control panel on the right with two knobs and a speaker grille, splayed
-// legs (the rear ones are shorter, so the screen leans back), and rabbit-ear
-// antennas. The right-angle USB-C plug points right inside the case, and the
-// cable leaves through a notch low on the right side near the back.
+// legs (set `tilt` > 0 to shorten the rear pair and lean the screen back),
+// and rabbit-ear
+// antennas. The right-angle USB-C plug sits under the board with its cable
+// heading back; the cable curves right and leaves through a notch low on the
+// right side near the back.
 //
 // Board numbers are first guesses — measure your board and fix them before
 // printing (README.md). Print `part = "fit_test"` first.
@@ -47,7 +49,7 @@ mic_holes = [];     // [x, z] from window centre, only if your board has front m
 mic_d     = 1.5;
 
 /* [Case] */
-tilt       = 7;     // screen lean-back, set by the leg lengths
+tilt       = 0;     // screen lean-back, set by the leg lengths (0 = upright like a real TV)
 wall       = 2.4;
 front_t    = 2.4;   // front wall incl. faceplate recess
 face_rec   = 1.0;   // faceplate thickness / recess depth
@@ -56,7 +58,7 @@ cr         = 7;     // corner radius of the TV body (front view)
 depth      = 42;
 side_gap   = 2.0;   // left: PCB edge to wall
 panel_w    = 22;    // right control panel, PCB edge to wall
-plug_room  = 14;    // under the PCB for the right-angle plug
+plug_room  = 18;    // under the PCB for the right-angle plug (overmold + bend)
 top_room   = 4;
 win_extra  = 3;     // window bigger than active area, shows black glass corners
 win_r      = 5;     // TV-screen corner radius
@@ -253,6 +255,8 @@ if (part == "assembly") {
     for (i = [0, 1]) translate([-19, 12 + i * 5, 2.3 * cos(30) / 2]) antenna_rod();
 } else if (part == "plungers") {
     for (i = [0 : len(buttons) - 1]) translate([i * 8, 0, 0]) plunger(plunger_len(buttons[i]));
+} else if (part == "dims") {
+    echo(str("body W x H x D = ", W, " x ", H, " x ", D, " mm; with legs + antennas: height ", H - desk_c + 38 * cos(28) + 1, " mm"));
 } else if (part == "fit_test") {
     rotate([90, 0, 0]) intersection() {
         body();
