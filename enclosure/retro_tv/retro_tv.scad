@@ -1,20 +1,19 @@
-// Clawdmeter "retro TV" desk dock for the Waveshare ESP32-C6-Touch-AMOLED-2.16.
+// Clawdmeter "retro TV" desk dock for the Waveshare ESP32-C6-Touch-AMOLED-2.16
+// (the finished device in its white 45 x 45 x 22 mm shell).
 //
 // A small 60s/70s television: screen on the left behind a rounded TV window,
 // a control panel on the right with two knobs and a speaker grille, four
 // splayed legs (set `tilt` > 0 to shorten the rear pair and lean the screen
 // back), and rabbit-ear antennas.
 //
-// The board is mounted a quarter turn from its natural orientation: its
-// USB-C edge faces RIGHT, so the right-angle plug hides behind the control
-// panel, and its button edge faces LEFT, so the buttons are pressed through
-// the left side of the case. The firmware's IMU auto-rotation shows the
-// picture upright. The cable runs from the plug along the floor and leaves
-// through the back cover's bottom corner on the button side (bottom right
-// seen from behind).
-//
-// Board numbers are first guesses — measure your board and fix them before
-// printing (README.md). Print `part = "fit_test"` first.
+// The device sits turned a quarter turn: USB-C faces RIGHT (the right-angle
+// plug hides behind the control panel), the three buttons face LEFT (pressed
+// through the left side of the TV with printed plungers), and its speaker
+// faces UP (slots in the TV's top let the sound out). The firmware's IMU
+// auto-rotation shows the picture upright. Four corner brackets centre the
+// device; two pressers on the back cover push it against the front lip. The
+// cable runs behind the device along the floor and leaves through the back
+// cover's bottom corner on the button side (bottom right seen from behind).
 //
 // Parts (render one at a time, already in print orientation):
 //   body        walnut   face-down, no supports
@@ -23,36 +22,26 @@
 //   knobs       dark     2x, decorative; pinned with a 1.75 mm filament stub
 //   legs        dark     4 legs (rear pair shorter when tilt > 0)
 //   antenna     grey     dome + 2 printable rods (or use 2 mm metal rod)
-//   plungers    any      one per side button
-//   fit_test    any      thin front slice to check window/board/button fit
+//   plungers    any      one per button
+//   fit_test    any      front slice: window, corner brackets, button holes
 //
 //   openscad -D 'part="body"' -o body.stl retro_tv.scad
 
-part = "assembly"; // [assembly, body, faceplate, back_cover, knobs, legs, antenna, plungers, fit_test]
+part = "assembly"; // [assembly, body, faceplate, back_cover, knobs, legs, antenna, plungers, dims, fit_test]
 
-/* [Board — MEASURE THESE, holding the board upright with USB-C at the bottom] */
-board_w    = 56;    // PCB width
-board_h    = 46;    // PCB height, USB-C edge to top edge
-pcb_t      = 1.6;
-glass_w    = 44;    // display glass/module outline
-glass_h    = 44;
-glass_t    = 1.5;   // glass standing proud of the PCB front
-glass_dv   = 0;     // glass centre offset up from PCB centre
-active     = 39.5;  // visible pixels (480x480 @ 2.16" ~ 38.8 mm)
-back_parts = 6;     // tallest part on the PCB back
-usb_dx     = 0;     // USB-C centre offset from the middle of the bottom edge (+ = right)
-
-// Buttons, measured AS MOUNTED (board turned, buttons on the left side):
-// [height of centre above the bottom of the mounted board,
-//  depth of centre behind the PCB front face].
-// BOOT = Space/voice, KEY = Shift+Tab, PWR = cycle screens / hold to pair.
-// PLACEHOLDER positions — measure your board.
-buttons      = [[14, 0.8], [28, 0.8], [42, 0.8]];
-btn_protrude = 0.8;
+/* [Device — measured as mounted (USB-C right, buttons left, speaker up)] */
+dev_w        = 45;     // shell width
+dev_h        = 45;     // shell height
+dev_d        = 22;     // shell depth, glass to back
+glass        = 43;     // glass outline (1 mm white rim all round)
+btn_z        = [12.5, 22.5, 32.5];  // button centres, from the bottom of the device
+btn_y        = 7.5;    // button centre behind the front face — ESTIMATE, please measure
+btn_protrude = 1.0;    // how far the buttons stick out of the shell
 btn_hole     = 3.2;
-
-mic_holes = [];     // [x, z] from window centre, only if your board has front mics
-mic_d     = 1.5;
+usb_y        = 11;     // USB-C centre behind the front face (middle of the depth)
+plug_len     = 14;     // right-angle plug head, from the shell to its far side
+spk_y        = 11;     // speaker grille centre behind the front face
+active       = 38.8;   // visible pixels (480x480 @ 2.16")
 
 /* [Case] */
 tilt       = 0;     // screen lean-back, set by the leg lengths (0 = upright like a real TV)
@@ -61,15 +50,14 @@ front_t    = 2.4;   // front wall incl. faceplate recess
 face_rec   = 1.0;   // faceplate thickness / recess depth
 fp_inset   = 4;     // walnut rim around the faceplate
 cr         = 7;     // corner radius of the TV body (front view)
-depth      = 42;
-panel_w    = 22;    // right control panel (plug lives behind it), board edge to wall
-plug_len   = 15;    // right-angle plug head, from the board edge to the far side
-bottom_room = 4;
-top_room   = 4;
-win_extra  = 3;     // window bigger than active area, shows black glass corners
+panel_w    = 22;    // right control panel (plug lives behind it)
+cable_lane = 9;     // room behind the device for the cable
+top_room   = 3;
+bottom_room = 3;
 win_r      = 5;     // TV-screen corner radius
-fit        = 0.4;
+fit        = 0.6;   // total clearance around the device
 clr        = 0.15;
+pad        = 1.5;   // gap between back-cover pressers and the device: stick a felt/rubber pad here
 cable_d    = 5.6;   // cable exit hole
 leg_len    = 13;    // front legs
 legs_inset = 9;
@@ -77,29 +65,27 @@ legs_inset = 9;
 $fn = 48;
 eps = 0.01;
 
-// ---- derived (installed orientation: board turned so USB-C faces right) ----
-iw = board_h;  ih = board_w;              // mounted board outline
-side_gap = btn_protrude + 1 + 0.4;        // left: room for button + plunger head
-W  = wall + side_gap + iw + fit + panel_w + wall;
-H  = wall + bottom_room + ih + top_room + wall;
-D  = depth;
-x0 = wall + side_gap + fit / 2;           // mounted PCB left edge (button edge)
-z0 = wall + bottom_room;                  // mounted PCB bottom edge
-pcb_front = front_t + glass_t;            // y of PCB front (glass rests on the front wall)
-pcb_back  = pcb_front + pcb_t;
-wc   = [x0 + iw / 2 - glass_dv, z0 + ih / 2];   // window centre (x, z)
-win  = active + win_extra;
+// ---- derived ----
+side_gap = btn_protrude + 1 + 0.4;         // left: button + plunger head
+W  = wall + side_gap + dev_w + fit + panel_w + wall;
+H  = wall + bottom_room + dev_h + fit + top_room + wall;
+D  = front_t + dev_d + cable_lane + 1.6;
+x0 = wall + side_gap + fit / 2;            // device left face
+z0 = wall + bottom_room + fit / 2;         // device bottom face
+dev_back = front_t + dev_d;
+wc   = [x0 + dev_w / 2, z0 + dev_h / 2];   // window centre (x, z)
+win  = glass - 1;                          // stays inside the glass: no white rim shows
 win_right = wc[0] + win / 2;
 knob_x = (win_right + W - fp_inset) / 2;
 knob_z = [wc[1] + 12, wc[1] - 1];
 grille_z = wc[1] - 11;
-usb_z    = z0 + ih / 2 + usb_dx;
+usb_z    = wc[1];
 legs = [for (x = [legs_inset, W - legs_inset], y = [legs_inset, D - legs_inset]) [x, y]];
 desk_c = -legs_inset * sin(tilt) - leg_len * cos(tilt); // desk plane: n·p = desk_c
+ant_y  = D - 6.5;                          // antenna behind the device (speaker slots in front)
 
-assert(win + 0.4 < min(glass_w, glass_h), "window larger than the glass — it would fall through");
-assert(D > pcb_back + back_parts + 6, "depth too small");
-assert(panel_w >= plug_len + 2, "panel_w too small for the plug");
+assert(win > active, "window smaller than the picture");
+assert(panel_w >= plug_len + 4, "panel_w too small for the plug");
 assert(leg_len - (D - 2 * legs_inset) * tan(tilt) > 3, "rear legs too short; raise leg_len or lower tilt");
 
 // ---- helpers ----
@@ -111,30 +97,27 @@ module xz_rrect(c, size, rr, y0, y1) // rounded rect in the front plane, from y0
 module ycyl(c, d, y0, y1) translate([c[0], y0, c[1]]) rotate([-90, 0, 0]) cylinder(d = d, h = y1 - y0);
 
 // ---- body ----
-// Clip posts on the mounted board's top and bottom edges (the left edge has
-// the buttons, the right edge the USB-C plug).
-module board_posts() for (s = [0, 1], x = [x0 + 7, x0 + iw - 7]) {
-    ze = s ? z0 + ih + fit / 2 : z0 - fit / 2;
-    translate([x - 3, front_t - eps, s ? ze : ze - 1.6]) cube([6, pcb_back + 3 - front_t, 1.6]);
-    hull() {   // hook: flat face holds the PCB back, ramp lets it snap in
-        translate([x - 3, pcb_back + 0.1, s ? ze - 0.6 : ze - eps]) cube([6, eps, 0.6 + eps]);
-        translate([x - 3, pcb_back + 2.6, s ? ze - eps : ze - eps]) cube([6, eps, 2 * eps]);
+// L-shaped brackets at the device's four corners centre it in the window.
+module corner_brackets() for (sx = [0, 1], sz = [0, 1]) {
+    cx = sx ? x0 + dev_w + fit / 2 : x0 - fit / 2;
+    cz = sz ? z0 + dev_h + fit / 2 : z0 - fit / 2;
+    dx = sx ? 1 : -1; dz = sz ? 1 : -1;  // outward
+    translate([0, front_t - eps, 0]) {
+        translate([sx ? cx : cx - 1.2, 0, sz ? cz - 7 : cz - 1.2]) cube([1.2, 5, 8.2]);
+        translate([sx ? cx - 7 : cx - 1.2, 0, sz ? cz : cz - 1.2]) cube([8.2, 5, 1.2]);
     }
 }
 
-function btn_x(b)  = x0 - btn_protrude;   // button tip (left edge)
-function btn_yz(b) = [pcb_front + b[1], z0 + b[0]];
+module button_holes() for (z = btn_z)
+    translate([-1, front_t + btn_y, z0 + z]) rotate([0, 90, 0]) cylinder(d = btn_hole, h = x0);
 
-module button_holes() for (b = buttons) {
-    yz = btn_yz(b);
-    translate([-1, yz[0], yz[1]]) rotate([0, 90, 0]) cylinder(d = btn_hole, h = x0);
-}
+// Speaker slots in the top, over the device's speaker grille.
+module speaker_slots() for (i = [-2 : 2])
+    translate([wc[0] - 8, front_t + spk_y + i * 2.6 - 0.6, H - wall - 1]) cube([16, 1.2, wall + 2]);
 
 // Cable exit through the back, in the bottom corner on the button side
-// (bottom right when you look at the back). The cable droops from the plug
-// and runs along the floor to it, so it is never bent tight. The hole
-// sits on the corner's diagonal; in the cover it is a notch open to the
-// corner, so the cover still goes on over a plugged-in cable, and the body's
+// (bottom right when you look at the back). In the cover it is a notch open
+// to the corner, so the cover goes on over a plugged-in cable; the body's
 // back rim closes it.
 cable_rc = cr - 1.2 - cable_d / 2 - 0.4;            // from the corner's arc centre
 cable_x  = cr - cable_rc * cos(45);
@@ -149,18 +132,18 @@ module body() {
                 yext(front_t, D + 1, wall);                     // cavity
                 yext(D - 1.6, D + 1, 1.2);                      // back cover counterbore
             }
-            board_posts();
+            corner_brackets();
             for (l = legs) translate([l[0], l[1], wall - eps]) cylinder(d = 8, h = 3.5);   // leg bosses
-            translate([W / 2, D / 2, H - wall - 3]) cylinder(d = 8, h = 3 + eps);        // antenna boss
+            translate([W / 2, ant_y, H - wall - 3]) cylinder(d = 8, h = 3 + eps);        // antenna boss
         }
         yext(-1, face_rec, fp_inset);                           // faceplate recess
-        xz_rrect(wc, [win + 0.4, win + 0.4], win_r, -1, front_t + 1);
+        xz_rrect(wc, [win, win], win_r, -1, front_t + 1);
         for (z = knob_z) ycyl([knob_x, z], 1.9, -1, front_t + eps);  // filament pin
-        for (m = mic_holes) ycyl([wc[0] + m[0], wc[1] + m[1]], mic_d, -1, front_t + 1);
         button_holes();
+        speaker_slots();
         cable_cut();
         for (l = legs) translate([l[0], l[1], -1]) cylinder(d = 4.2, h = 5.5 + 1);
-        translate([W / 2, D / 2, H - 6]) cylinder(d = 4.2, h = 7);
+        translate([W / 2, ant_y, H - 6]) cylinder(d = 4.2, h = 7);
     }
 }
 
@@ -170,13 +153,15 @@ module faceplate() difference() {
     xz_rrect(wc, [win, win], win_r, -1, face_rec + 1);
     for (z = knob_z) ycyl([knob_x, z], 2.3, -1, face_rec + 1);
     for (i = [0 : 3]) xz_rrect([knob_x, grille_z - i * 2.6], [12, 1.2], 0.55, -1, face_rec + 1);
-    for (m = mic_holes) ycyl([wc[0] + m[0], wc[1] + m[1]], mic_d, -1, face_rec + 1);
 }
 
 // ---- back cover (body coordinates) ----
 module back_cover() difference() {
     union() {
         yext(D - 1.6 + clr, D, 1.2 + clr);
+        // two pressers that hold the device against the front lip (via a pad)
+        for (dx = [-12, 12]) translate([wc[0] + dx - 3, dev_back + pad, wc[1] - 5])
+            cube([6, D - 1.6 + clr + eps - dev_back - pad, 10]);
         difference() {
             yext(D - 1.6 - 4, D - 1.6 + clr + eps, wall + clr);
             yext(D - 7, D, wall + clr + 1.6);
@@ -222,12 +207,12 @@ module antenna_dome() {
 module antenna_rod() rotate([0, 90, 0]) rotate([0, 0, 30]) cylinder(d = 2.3, h = 38, $fn = 6);
 
 module plunger(len) { cylinder(d = btn_hole + 2, h = 1); cylinder(d = btn_hole - 0.4, h = 1 + len); }
-function plunger_len(b) = (btn_x(b) - 1) + 0.8;
+function plunger_len(b) = (x0 - btn_protrude - 1) + 0.8;
 
 // ---- preview-only fake screen ----
 module ui() {
     module slab(c, s, rr, t, y) xz_rrect(c, s, rr, y, y + t);
-    color("#0b0b0b") slab([0, 0], [glass_w, glass_h], 2, 0.4, 0);
+    color("#0b0b0b") slab([0, 0], [glass, glass], 3, 0.4, 0);
     for (i = [0, 1]) let(z = 9 - i * 16, f = [0.62, 0.35][i]) {
         color("#f2efe6") slab([-11, z + 6], [14, 1.6], 0.4, 0.1, -0.1);
         color("#333")    slab([0, z], [32, 4], 1.9, 0.1, -0.1);
@@ -239,10 +224,11 @@ module tv_assembly() {
     color("#7a4a2c") body();
     color("#e9e2d0") faceplate();
     color("#6e4226") back_cover();
-    translate([wc[0], front_t, wc[1]]) ui();
+    translate([wc[0], front_t + 0.5, wc[1]]) ui();
+    color("#f4f4f2") translate([x0, front_t + 1, z0]) cube([dev_w, dev_d - 1, dev_h]);  // the device
     for (z = knob_z) color("#3a2a20") translate([knob_x, 0, z]) rotate([90, 0, 0]) knob();
     for (l = legs) color("#3a2a20") leg_raw(l);
-    color("#9aa0a6") translate([W / 2, D / 2, H]) {
+    color("#9aa0a6") translate([W / 2, ant_y, H]) {
         antenna_dome();
         for (s = [-1, 1]) rotate([0, s * 28, 0]) translate([0, 0, 1]) cylinder(d = 2.3, h = 38, $fn = 6);
     }
@@ -265,12 +251,12 @@ if (part == "assembly") {
     translate([0, 0, 4.5]) antenna_dome();
     for (i = [0, 1]) translate([-19, 12 + i * 5, 2.3 * cos(30) / 2]) antenna_rod();
 } else if (part == "plungers") {
-    for (i = [0 : len(buttons) - 1]) translate([i * 8, 0, 0]) plunger(plunger_len(buttons[i]));
+    for (i = [0 : len(btn_z) - 1]) translate([i * 8, 0, 0]) plunger(plunger_len(0));
 } else if (part == "dims") {
     echo(str("body W x H x D = ", W, " x ", H, " x ", D, " mm; with legs + antennas: height ", H - desk_c + 38 * cos(28) + 1, " mm"));
 } else if (part == "fit_test") {
     rotate([90, 0, 0]) intersection() {
         body();
-        translate([-1, -1, -1]) cube([W + 2, pcb_back + 4, H + 2]);
+        translate([-1, -1, -1]) cube([W + 2, front_t + btn_y + 4, H + 2]);
     }
 }
