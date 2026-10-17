@@ -68,7 +68,7 @@ All STLs come out already in print orientation:
 | `knobs` | dark brown | Decorative, pinned with a short stub of 1.75 mm filament. |
 | `legs` | dark brown | 4 legs, all the same length at `tilt = 0`. Press-fit or glue. |
 | `antenna` | grey | Dome + 2 rods. 2 mm metal rod or a bamboo skewer looks better than printed rods. |
-| `plungers` | any | 3, through the left wall. |
+| `plungers` | any (dark brown looks like real buttons) | 3 pill-shaped pins, the size of the device's own buttons (6 × 4 mm). They sit in matching holes in the left wall. |
 
 Matte PLA, 0.16–0.2 mm layers, 3–4 walls, 15–20 % gyroid.
 

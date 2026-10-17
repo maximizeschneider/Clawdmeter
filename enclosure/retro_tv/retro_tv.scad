@@ -38,7 +38,8 @@ glass        = 43;     // glass outline (1 mm white rim all round)
 btn_z        = [12.5, 22.5, 32.5];  // button centres, from the bottom of the device
 btn_y        = 9.5;    // button centre behind the front face (shell rim)
 btn_protrude = 1.0;    // how far the buttons stick out of the shell
-btn_hole     = 3.2;
+btn_size     = [6, 4]; // the device's pill-shaped buttons: length along the edge, width; the pins match it
+btn_clr      = 0.4;    // pin-to-hole clearance (total)
 usb_y        = 11;     // USB-C centre behind the front face (middle of the depth)
 plug_len     = 14;     // right-angle plug head, from the shell to its far side
 spk_y        = 11;     // speaker grille centre behind the front face
@@ -109,8 +110,14 @@ module corner_brackets() for (sx = [0, 1], sz = [0, 1]) {
     }
 }
 
+// Pill (stadium) outline, long axis along y of the 2D plane.
+module pill(size) hull() for (s = [-1, 1])
+    translate([0, s * (size[0] - size[1]) / 2]) circle(d = size[1]);
+
+// Holes in the left wall: same pill shape as the device's buttons.
 module button_holes() for (z = btn_z)
-    translate([-1, front_t + btn_y, z0 + z]) rotate([0, 90, 0]) cylinder(d = btn_hole, h = x0);
+    translate([-1, front_t + btn_y, z0 + z]) rotate([0, 90, 0]) rotate([0, 0, 90])
+        linear_extrude(x0) pill(btn_size + [btn_clr, btn_clr]);
 
 // Speaker slots in the top, over the device's speaker grille.
 module speaker_slots() for (i = [-2 : 2])
@@ -208,7 +215,12 @@ module antenna_dome() {
 }
 module antenna_rod() rotate([0, 90, 0]) rotate([0, 0, 30]) cylinder(d = 2.3, h = 38, $fn = 6);
 
-module plunger(len) { cylinder(d = btn_hole + 2, h = 1); cylinder(d = btn_hole - 0.4, h = 1 + len); }
+// Button pin, printed head-down: the pill shaft is the size of the device's
+// button and fills its hole; the wider head inside keeps it from falling out.
+module plunger(len) {
+    linear_extrude(1) pill(btn_size + [2, 2]);
+    linear_extrude(1 + len) pill(btn_size);
+}
 function plunger_len(b) = (x0 - btn_protrude - 1) + 0.8;
 
 // ---- preview-only fake screen ----
@@ -253,7 +265,7 @@ if (part == "assembly") {
     translate([0, 0, 4.5]) antenna_dome();
     for (i = [0, 1]) translate([-19, 12 + i * 5, 2.3 * cos(30) / 2]) antenna_rod();
 } else if (part == "plungers") {
-    for (i = [0 : len(btn_z) - 1]) translate([i * 8, 0, 0]) plunger(plunger_len(0));
+    for (i = [0 : len(btn_z) - 1]) translate([i * (btn_size[1] + 4), 0, 0]) plunger(plunger_len(0));
 } else if (part == "dims") {
     echo(str("body W x H x D = ", W, " x ", H, " x ", D, " mm; with legs + antennas: height ", H - desk_c + 38 * cos(28) + 1, " mm"));
 } else if (part == "fit_test") {

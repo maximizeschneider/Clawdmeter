@@ -42,7 +42,7 @@ re-export (or ask Claude to). Don't print the rest until this fits.
 | `knobs.stl` | dark brown / black | 1 file = 2 knobs | ~15 min |
 | `legs.stl` | dark brown / black | 1 file = 4 legs, with brim | ~30 min |
 | `antenna.stl` | grey / silver | 1 file = dome + 2 rods, with brim | ~20 min |
-| `plungers.stl` | any | 1 file = 3 pins | ~10 min |
+| `plungers.stl` | dark brown (or any) | 1 file = 3 button pins | ~10 min |
 
 Small parts of the same colour can share one print (knobs + legs, for
 example). Everything can also be printed in a single colour; the separate
