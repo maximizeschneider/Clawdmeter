@@ -51,7 +51,7 @@ face_rec   = 1.0;   // faceplate thickness / recess depth
 fp_inset   = 4;     // walnut rim around the faceplate
 cr         = 7;     // corner radius of the TV body (front view)
 panel_w    = 22;    // right control panel (plug lives behind it)
-cable_lane = 9;     // room behind the device for the cable
+cable_lane = 16;    // room behind the device: the stiff cable needs a bend radius, not just its own thickness
 top_room   = 3;
 bottom_room = 3;
 win_r      = 5;     // TV-screen corner radius
@@ -159,8 +159,9 @@ module faceplate() difference() {
 module back_cover() difference() {
     union() {
         yext(D - 1.6 + clr, D, 1.2 + clr);
-        // two pressers that hold the device against the front lip (via a pad)
-        for (dx = [-12, 12]) translate([wc[0] + dx - 3, dev_back + pad, wc[1] - 5])
+        // two pressers that hold the device against the front lip (via a pad);
+        // high up, so they stay clear of the cable sweeping down along the back
+        for (dx = [-12, 12]) translate([wc[0] + dx - 3, dev_back + pad, z0 + dev_h - 14])
             cube([6, D - 1.6 + clr + eps - dev_back - pad, 10]);
         difference() {
             yext(D - 1.6 - 4, D - 1.6 + clr + eps, wall + clr);

@@ -17,11 +17,13 @@ left, and the speaker up.
 - Slots in the TV's top let the speaker sound out.
 - The device's motion sensor (IMU) turns the picture upright by itself. Touch
   needs no change, since a tap anywhere just switches screens.
-- The cable runs behind the device along the floor and leaves through the
-  back cover's bottom corner on the button side (bottom right seen from
-  behind).
+- The cable leaves the plug heading back, curves round behind the device,
+  runs along its back and leaves through the back cover's bottom corner on
+  the button side (bottom right seen from behind). The space behind the
+  device (`cable_lane`, 16 mm) leaves room for a ~12 mm bend radius, because
+  braided cables are too stiff to fold flat against the device's back.
 
-Size: 75 × 56 × 35 mm body. On its legs it stands about 70 mm tall, or about
+Size: 75 × 56 × 42 mm body. On its legs it stands about 70 mm tall, or about
 104 mm to the antenna tips. Run `openscad -D 'part="dims"' -o x.stl retro_tv.scad`
 to print the numbers after you change parameters.
 
@@ -59,7 +61,7 @@ All STLs come out already in print orientation:
 |---|---|---|
 | `body` | walnut brown | Face-down, no supports. |
 | `faceplate` | cream | Glue it into the front recess. This gives the two-tone look without a multi-colour printer. |
-| `back_cover` | walnut | Friction fit, with vents. Its two pressers hold the device against the front. |
+| `back_cover` | walnut | Friction fit, with vents. Its two pressers (high up, clear of the cable) hold the device against the front. |
 | `knobs` | dark brown | Decorative, pinned with a short stub of 1.75 mm filament. |
 | `legs` | dark brown | 4 legs, all the same length at `tilt = 0`. Press-fit or glue. |
 | `antenna` | grey | Dome + 2 rods. 2 mm metal rod or a bamboo skewer looks better than printed rods. |
@@ -73,8 +75,9 @@ Matte PLA, 0.16–0.2 mm layers, 3–4 walls, 15–20 % gyroid.
 2. Drop the three plungers into the left-side holes from the inside.
 3. Slide the device in from the back: screen first, USB-C to the right,
    buttons to the left, speaker up.
-4. Plug in the right-angle USB-C. Run the cable behind the device, along the
-   floor, to the bottom corner on the button side, and lay it into the notch.
+4. Plug in the right-angle USB-C. Curve the cable round behind the device,
+   along its back, to the bottom corner on the button side, and lay it into
+   the notch.
 5. Stick a small felt or rubber pad (1–2 mm) on each presser of the back
    cover, then press the cover on. The pads push the device snugly against
    the front.
