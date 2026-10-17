@@ -10,20 +10,21 @@ rabbit-ear antennas on top.
 |---|---|
 | ![front](preview_front.png) | ![left](preview_left.png) |
 
-**The device is mounted a quarter turn:** USB-C faces right, the buttons
-left, and the speaker up.
+**The device is mounted a quarter turn:** USB-C faces right and the buttons
+face left.
 - The right-angle plug hides behind the control panel.
 - The three buttons are pressed through the left side with printed plungers.
-- Slots in the TV's top let the speaker sound out.
+- The device's speaker sits on its back, so the sound comes out through the
+  vents in the upper half of the back cover. The slots on top are decoration.
 - The device's motion sensor (IMU) turns the picture upright by itself. Touch
   needs no change, since a tap anywhere just switches screens.
 - The cable leaves the plug heading back, curves round behind the device,
   runs along its back and leaves through the back cover's bottom corner on
   the button side (bottom right seen from behind). The space behind the
-  device (`cable_lane`, 16 mm) leaves room for a ~12 mm bend radius, because
-  braided cables are too stiff to fold flat against the device's back.
+  device (`cable_lane`, 12 mm) fits the loop the stiff braided cable makes
+  going round onto the device's back (~7–9 mm), plus some slack.
 
-Size: 75 × 56 × 42 mm body. On its legs it stands about 70 mm tall, or about
+Size: 75 × 56 × 38 mm body. On its legs it stands about 70 mm tall, or about
 104 mm to the antenna tips. Run `openscad -D 'part="dims"' -o x.stl retro_tv.scad`
 to print the numbers after you change parameters.
 
@@ -32,8 +33,7 @@ press F5 to preview, and use Window → Customizer to change the numbers.
 
 ## Measurements used
 
-All measurements are with the device as mounted (USB-C right, buttons left,
-speaker up):
+All measurements are with the device as mounted (USB-C right, buttons left):
 
 | Parameter | Value | Note |
 |---|---|---|
@@ -74,7 +74,7 @@ Matte PLA, 0.16–0.2 mm layers, 3–4 walls, 15–20 % gyroid.
 1. Glue the faceplate in, then pin and glue the knobs.
 2. Drop the three plungers into the left-side holes from the inside.
 3. Slide the device in from the back: screen first, USB-C to the right,
-   buttons to the left, speaker up.
+   buttons to the left.
 4. Plug in the right-angle USB-C. Curve the cable round behind the device,
    along its back, to the bottom corner on the button side, and lay it into
    the notch.

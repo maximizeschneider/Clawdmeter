@@ -7,13 +7,15 @@
 // back), and rabbit-ear antennas.
 //
 // The device sits turned a quarter turn: USB-C faces RIGHT (the right-angle
-// plug hides behind the control panel), the three buttons face LEFT (pressed
-// through the left side of the TV with printed plungers), and its speaker
-// faces UP (slots in the TV's top let the sound out). The firmware's IMU
-// auto-rotation shows the picture upright. Four corner brackets centre the
-// device; two pressers on the back cover push it against the front lip. The
-// cable runs behind the device along the floor and leaves through the back
-// cover's bottom corner on the button side (bottom right seen from behind).
+// plug hides behind the control panel) and the three buttons face LEFT
+// (pressed through the left side of the TV with printed plungers). Its
+// speaker grille, on the device's back near the top edge, plays into the
+// cavity and out through the back-cover vents; the slots in the TV's top are
+// decorative. The firmware's IMU auto-rotation shows the picture upright.
+// Four corner brackets centre the device; two pressers on the back cover push
+// it against the front lip. The cable loops round onto the device's back and
+// leaves through the back cover's bottom corner on the button side (bottom
+// right seen from behind).
 //
 // Parts (render one at a time, already in print orientation):
 //   body        walnut   face-down, no supports
@@ -29,7 +31,7 @@
 
 part = "assembly"; // [assembly, body, faceplate, back_cover, knobs, legs, antenna, plungers, dims, fit_test]
 
-/* [Device — measured as mounted (USB-C right, buttons left, speaker up)] */
+/* [Device — measured as mounted (USB-C right, buttons left)] */
 dev_w        = 45;     // shell width
 dev_h        = 45;     // shell height
 dev_d        = 22;     // shell depth, glass to back
@@ -40,7 +42,7 @@ btn_protrude = 1.0;    // how far the buttons stick out of the shell
 btn_hole     = 3.2;
 usb_y        = 11;     // USB-C centre behind the front face (middle of the depth)
 plug_len     = 14;     // right-angle plug head, from the shell to its far side
-spk_y        = 11;     // speaker grille centre behind the front face
+spk_y        = 11;     // centre of the decorative top slots, behind the front face
 active       = 38.8;   // visible pixels (480x480 @ 2.16")
 
 /* [Case] */
@@ -51,7 +53,7 @@ face_rec   = 1.0;   // faceplate thickness / recess depth
 fp_inset   = 4;     // walnut rim around the faceplate
 cr         = 7;     // corner radius of the TV body (front view)
 panel_w    = 22;    // right control panel (plug lives behind it)
-cable_lane = 16;    // room behind the device: the stiff cable needs a bend radius, not just its own thickness
+cable_lane = 12;    // room behind the device: the cable's loop round onto the device's back sticks out ~7-9 mm, plus slack
 top_room   = 3;
 bottom_room = 3;
 win_r      = 5;     // TV-screen corner radius
@@ -82,7 +84,7 @@ grille_z = wc[1] - 11;
 usb_z    = wc[1];
 legs = [for (x = [legs_inset, W - legs_inset], y = [legs_inset, D - legs_inset]) [x, y]];
 desk_c = -legs_inset * sin(tilt) - leg_len * cos(tilt); // desk plane: n·p = desk_c
-ant_y  = D - 6.5;                          // antenna behind the device (speaker slots in front)
+ant_y  = D - 6.5;                          // antenna behind the top slots
 
 assert(win > active, "window smaller than the picture");
 assert(panel_w >= plug_len + 4, "panel_w too small for the plug");
@@ -111,7 +113,7 @@ module corner_brackets() for (sx = [0, 1], sz = [0, 1]) {
 module button_holes() for (z = btn_z)
     translate([-1, front_t + btn_y, z0 + z]) rotate([0, 90, 0]) cylinder(d = btn_hole, h = x0);
 
-// Speaker slots in the top, over the device's speaker grille.
+// Decorative vent slots in the top.
 module speaker_slots() for (i = [-2 : 2])
     translate([wc[0] - 8, front_t + spk_y + i * 2.6 - 0.6, H - wall - 1]) cube([16, 1.2, wall + 2]);
 
