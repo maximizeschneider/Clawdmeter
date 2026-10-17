@@ -8,7 +8,7 @@ rabbit-ear antennas on top.
 **The board is mounted a quarter turn from upright:** USB-C faces right and
 the buttons face left.
 - The right-angle plug hides behind the control panel, with its cable
-  heading straight out through the back cover, near its right edge.
+  drooping in a gentle curve to the bottom-right corner of the back cover.
 - The three buttons are pressed through the left side of the case.
 - The board's motion sensor (IMU) turns the picture upright by itself.
 
@@ -66,8 +66,8 @@ cream and dark-brown PLA all exist, so no painting is needed.
 3. Push the board in from the back, glass first, until it snaps past the four
    clip posts.
 4. Plug in the right-angle USB-C with the cable pointing toward the back.
-   Run the cable straight back and lay it into the notch at the right edge of
-   the back cover's opening, then press the cover on.
+   Let the cable droop back and down into the bottom-right corner of the
+   opening, lay it into the notch there, then press the cover on.
 5. Press the back cover on, then press in the legs and the antenna dome.
 
 `tilt` (default 0) shortens the rear legs to lean the screen back if you
