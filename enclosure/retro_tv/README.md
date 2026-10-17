@@ -3,7 +3,7 @@
 A small 60s-style television for the Clawdmeter. The screen sits on the
 left behind a rounded TV window. On the right is a control panel with two
 knobs and a speaker grille. Splayed legs (the rear ones are shorter) lean
-the screen back 12°, and there are rabbit-ear antennas on top. The
+the screen back 7°, and there are rabbit-ear antennas on top. The
 right-angle USB-C plug stays hidden inside, and the cable leaves through a
 notch low on the right side near the back.
 
@@ -58,5 +58,5 @@ cream and dark-brown PLA all exist, so no painting is needed.
    out through the notch.
 5. Press the back cover on, then press in the legs and the antenna dome.
 
-The 12° tilt is set by `tilt` (and `leg_len`). The IMU auto-rotation still
+The 7° tilt is set by `tilt` (and `leg_len`). The IMU auto-rotation still
 reads the screen as upright.

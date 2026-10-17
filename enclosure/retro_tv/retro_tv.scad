@@ -47,7 +47,7 @@ mic_holes = [];     // [x, z] from window centre, only if your board has front m
 mic_d     = 1.5;
 
 /* [Case] */
-tilt       = 12;    // screen lean-back, set by the leg lengths
+tilt       = 7;     // screen lean-back, set by the leg lengths
 wall       = 2.4;
 front_t    = 2.4;   // front wall incl. faceplate recess
 face_rec   = 1.0;   // faceplate thickness / recess depth
