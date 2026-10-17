@@ -9,8 +9,9 @@
 // USB-C edge faces RIGHT, so the right-angle plug hides behind the control
 // panel, and its button edge faces LEFT, so the buttons are pressed through
 // the left side of the case. The firmware's IMU auto-rotation shows the
-// picture upright. The cable droops from the plug and leaves through the
-// bottom-right corner of the back cover.
+// picture upright. The cable runs from the plug along the floor and leaves
+// through the back cover's bottom corner on the button side (bottom right
+// seen from behind).
 //
 // Board numbers are first guesses — measure your board and fix them before
 // printing (README.md). Print `part = "fit_test"` first.
@@ -129,13 +130,14 @@ module button_holes() for (b = buttons) {
     translate([-1, yz[0], yz[1]]) rotate([0, 90, 0]) cylinder(d = btn_hole, h = x0);
 }
 
-// Cable exit through the back, in the bottom-right corner, so the cable can
-// droop in a gentle curve from the plug instead of being bent tight. The hole
+// Cable exit through the back, in the bottom corner on the button side
+// (bottom right when you look at the back). The cable droops from the plug
+// and runs along the floor to it, so it is never bent tight. The hole
 // sits on the corner's diagonal; in the cover it is a notch open to the
 // corner, so the cover still goes on over a plugged-in cable, and the body's
 // back rim closes it.
 cable_rc = cr - 1.2 - cable_d / 2 - 0.4;            // from the corner's arc centre
-cable_x  = W - cr + cable_rc * cos(45);
+cable_x  = cr - cable_rc * cos(45);
 cable_z  = cr - cable_rc * sin(45);
 module cable_cut() ycyl([cable_x, cable_z], cable_d, D - 6, D + 1);
 
@@ -183,7 +185,7 @@ module back_cover() difference() {
     for (i = [0 : 4]) xz_rrect([W / 2, H - 14 - i * 4.5], [W - 24, 2], 0.99, D - 3, D + 1);
     hull() {
         ycyl([cable_x, cable_z], cable_d, D - 8, D + 1);
-        ycyl([cable_x + 6, cable_z - 6], cable_d, D - 8, D + 1);
+        ycyl([cable_x - 6, cable_z - 6], cable_d, D - 8, D + 1);
     }
 }
 
