@@ -234,15 +234,22 @@ module ui() {
     }
 }
 
+// Preview colours (filament colours to choose); override with -D, e.g.
+// -D 'col_body="#222"'.
+col_body  = "#7a4a2c";   // body, back cover, button pins
+col_face  = "#e9e2d0";   // front panel
+col_dark  = "#3a2a20";   // knobs, legs
+col_ant   = "#9aa0a6";   // antenna
+
 module tv_assembly() {
-    color("#7a4a2c") body();
-    color("#e9e2d0") faceplate();
-    color("#6e4226") back_cover();
+    color(col_body) body();
+    color(col_face) faceplate();
+    color(col_body) back_cover();
     translate([wc[0], front_t + 0.5, wc[1]]) ui();
     color("#f4f4f2") translate([x0, front_t + 1, z0]) cube([dev_w, dev_d - 1, dev_h]);  // the device
-    for (z = knob_z) color("#3a2a20") translate([knob_x, 0, z]) rotate([90, 0, 0]) knob();
-    for (l = legs) color("#3a2a20") leg_raw(l);
-    color("#9aa0a6") translate([W / 2, ant_y, H]) {
+    for (z = knob_z) color(col_dark) translate([knob_x, 0, z]) rotate([90, 0, 0]) knob();
+    for (l = legs) color(col_dark) leg_raw(l);
+    color(col_ant) translate([W / 2, ant_y, H]) {
         antenna_dome();
         for (s = [-1, 1]) rotate([0, s * 28, 0]) translate([0, 0, 1]) cylinder(d = 2.3, h = 38, $fn = 6);
     }
