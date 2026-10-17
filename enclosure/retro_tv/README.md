@@ -10,12 +10,11 @@ rabbit-ear antennas on top.
 |---|---|
 | ![front](preview_front.png) | ![left](preview_left.png) |
 
-**The device is mounted a quarter turn:** USB-C faces right and the buttons
-face left.
+**The device is mounted a quarter turn:** USB-C faces right, the buttons
+left, and the speaker up.
 - The right-angle plug hides behind the control panel.
 - The three buttons are pressed through the left side with printed plungers.
-- The device's speaker sits on its back, so the sound comes out through the
-  vents in the upper half of the back cover. The slots on top are decoration.
+- Slots in the TV's top sit over the speaker grille and let the sound out.
 - The device's motion sensor (IMU) turns the picture upright by itself. Touch
   needs no change, since a tap anywhere just switches screens.
 - The cable leaves the plug heading back, curves round behind the device,
@@ -33,7 +32,8 @@ press F5 to preview, and use Window → Customizer to change the numbers.
 
 ## Measurements used
 
-All measurements are with the device as mounted (USB-C right, buttons left):
+All measurements are with the device as mounted (USB-C right, buttons left,
+speaker up):
 
 | Parameter | Value | Note |
 |---|---|---|
@@ -74,7 +74,7 @@ Matte PLA, 0.16–0.2 mm layers, 3–4 walls, 15–20 % gyroid.
 1. Glue the faceplate in, then pin and glue the knobs.
 2. Drop the three plungers into the left-side holes from the inside.
 3. Slide the device in from the back: screen first, USB-C to the right,
-   buttons to the left.
+   buttons to the left, speaker up.
 4. Plug in the right-angle USB-C. Curve the cable round behind the device,
    along its back, to the bottom corner on the button side, and lay it into
    the notch.
