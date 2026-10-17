@@ -27,8 +27,8 @@ Size: 75 × 56 × 38 mm body. On its legs it stands about 70 mm tall, or about
 104 mm to the antenna tips. Run `openscad -D 'part="dims"' -o x.stl retro_tv.scad`
 to print the numbers after you change parameters.
 
-**Printing:** ready-made STL files are in [`stl/`](stl/), one plate per
-filament colour, with settings in [PRINTING.md](PRINTING.md).
+**Printing:** ready-made STL files are in [`stl/`](stl/): six colour schemes,
+one plate per filament colour, with settings in [PRINTING.md](PRINTING.md).
 
 `retro_tv.scad` is fully parametric. Open it in [OpenSCAD](https://openscad.org),
 press F5 to preview, and use Window → Customizer to change the numbers.

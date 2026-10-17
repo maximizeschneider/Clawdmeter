@@ -28,7 +28,7 @@
 //
 //   openscad -D 'part="body"' -o body.stl retro_tv.scad
 
-part = "assembly"; // [assembly, plate_brown, plate_cream, plate_dark, plate_grey, fit_test, body, faceplate, back_cover, knobs, legs, antenna, plungers, dims]
+part = "assembly"; // [assembly, plate, fit_test, body, faceplate, back_cover, knobs, legs, antenna, plungers, dims]
 
 /* [Device — measured as mounted (USB-C right, buttons left, speaker up)] */
 dev_w        = 45;     // shell width
@@ -281,29 +281,45 @@ module print_part(name) {
     }
 }
 
-// One plate per filament colour: load one file, print, swap filament, next.
-// The button pins are body-coloured so they blend into the TV's side.
-module plate(colour) {
-    if (colour == "brown") {
+// Print plates: one plate per filament colour. A colour scheme decides which
+// groups share a colour, so a plate takes a list of groups:
+//   "main" = body + back cover + button pins (pins are body-coloured)
+//   "face" = front panel, "dark" = knobs + legs, "ant" = antenna dome + rods
+// "main" sits at the origin; the small groups stack in a column to its
+// right. Everything fits a 180 x 180 mm bed.
+roles = ["main"];
+
+module group(name) {   // each group with its footprint's min corner at (0, 0)
+    if (name == "main") translate([0, 61.4, 0]) {
         translate([0, -5, 0]) print_part("body");
         print_part("back_cover");
         translate([W + 8, 4, 0]) print_part("plungers");
-    } else if (colour == "cream") {
-        print_part("faceplate");
-    } else if (colour == "dark") {
-        print_part("knobs");
-        translate([0, 16, 0]) print_part("legs");
-    } else if (colour == "grey") {
-        print_part("antenna");
     }
+    if (name == "face") translate([-4.2, 52.2, 0]) print_part("faceplate");
+    if (name == "dark") {
+        translate([4.5, 4.5, 0]) print_part("knobs");
+        translate([4.5, 16, 0]) print_part("legs");
+    }
+    if (name == "ant") translate([19, 7, 0]) print_part("antenna");
 }
+group_h = [["face", 48.1], ["dark", 19.7], ["ant", 25.1]];
+
+module plate(groups) {
+    has = function(g) len([for (x = groups) if (x == g) 1]) > 0;
+    if (has("main")) group("main");
+    col_x = has("main") ? 108 : 0;
+    small = [for (g = group_h) if (has(g[0])) g];
+    for (i = [0 : len(small) - 1])
+        translate([col_x, i == 0 ? 0 : sum_h(small, i) + 6 * i, 0]) group(small[i][0]);
+}
+function sum_h(list, n) = n <= 0 ? 0 : list[n - 1][1] + sum_h(list, n - 1);
 
 if (part == "assembly") {
     translate([0, 0, -desk_c]) rotate([-tilt, 0, 0]) tv_assembly();
 } else if (part == "dims") {
     echo(str("body W x H x D = ", W, " x ", H, " x ", D, " mm; with legs + antennas: height ", H - desk_c + 38 * cos(28) + 1, " mm"));
-} else if (part == "plate_brown" || part == "plate_cream" || part == "plate_dark" || part == "plate_grey") {
-    plate(part == "plate_brown" ? "brown" : part == "plate_cream" ? "cream" : part == "plate_dark" ? "dark" : "grey");
+} else if (part == "plate") {
+    plate(roles);
 } else {
     print_part(part);
 }

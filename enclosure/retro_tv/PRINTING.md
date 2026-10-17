@@ -32,25 +32,36 @@ screen first, USB-C to the right, buttons on the left. Check:
 If anything is off, measure by how much, adjust `retro_tv.scad`, and
 re-export (or ask Claude to). Don't print the rest until this fits.
 
-## Step 2: one plate per colour
+## Step 2: pick a colour scheme, print its plates
 
-The parts are already grouped: each file is one full plate in one colour.
-Load the file, put that filament in, print, then go to the next.
+Each folder in `stl/` is one colour scheme. Inside it there's **one file per
+filament colour**, and each file is one ready plate. Load a file, put that
+filament in, print, then do the next file. Every plate fits a 180 × 180 mm bed.
 
-| File | Filament | What's on it | Time (rough) |
-|---|---|---|---|
-| `1_brown.stl` | walnut / brown | TV body, back cover, 3 button pins | ~4 h |
-| `2_cream.stl` | cream / beige | front panel | ~20 min |
-| `3_dark.stl` | dark brown / black | 2 knobs, 4 legs (**add a brim**) | ~45 min |
-| `4_grey.stl` | grey / silver | antenna dome + 2 rods (**add a brim**) | ~20 min |
+| Folder | Files (= filament colours) | Look |
+|---|---|---|
+| `1_classic/` | walnut brown, cream, dark brown, grey | 60s wood TV |
+| `2_black_grey/` | black, light grey, grey | 70s black set with a silver panel |
+| `3_grey_white/` | grey, white, black | bright, high contrast |
+| `4_white_black/` | white, black, grey | modern white with a black panel |
+| `5_white_grey/` | white, light grey, grey | soft, all light |
+| `6_one_colour/` | one file, any single colour | everything in one print |
 
-The button pins are body-coloured on purpose, so they blend into the TV's
-side. The largest plate (brown) is 102 × 116 mm, so it fits any printer.
+![colour schemes](colour_schemes.png)
 
-- **Only one colour?** Print all four files in it. It works the same, just
-  without the two-tone look.
-- **Multi-colour printer (e.g. Bambu AMS)?** Load all four files together
-  as one project, give each object its filament, and print in one go.
+Schemes 1–5 in the picture's top row and bottom-left; the last three show the
+one-colour plate in black, grey and white.
+
+What's on the plates: the body, back cover and 3 button pins are always the
+body colour (the pins blend into the TV's side). The front panel, the knobs
++ legs and the antenna go with whichever colour the scheme gives them.
+
+- **Brim:** add one for the legs and the antenna (small footprints). With
+  them on the same plate as the body, a brim on everything is fine too.
+- **Time:** about 4 h for the body plate, under 1 h for each of the others.
+  The single-colour plate takes about 5–6 h.
+- **Multi-colour printer (e.g. Bambu AMS)?** Load all files of one scheme
+  together as one project, give each object its filament, and print in one go.
 
 Single parts (to reprint just one) are in `stl/parts/`.
 
