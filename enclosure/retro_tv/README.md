@@ -27,8 +27,8 @@ Size: 75 × 56 × 38 mm body. On its legs it stands about 70 mm tall, or about
 104 mm to the antenna tips. Run `openscad -D 'part="dims"' -o x.stl retro_tv.scad`
 to print the numbers after you change parameters.
 
-**Printing:** ready-made STL files are in [`stl/`](stl/), with settings in
-[PRINTING.md](PRINTING.md).
+**Printing:** ready-made STL files are in [`stl/`](stl/), one plate per
+filament colour, with settings in [PRINTING.md](PRINTING.md).
 
 `retro_tv.scad` is fully parametric. Open it in [OpenSCAD](https://openscad.org),
 press F5 to preview, and use Window → Customizer to change the numbers.
@@ -68,7 +68,7 @@ All STLs come out already in print orientation:
 | `knobs` | dark brown | Decorative, pinned with a short stub of 1.75 mm filament. |
 | `legs` | dark brown | 4 legs, all the same length at `tilt = 0`. Press-fit or glue. |
 | `antenna` | grey | Dome + 2 rods. 2 mm metal rod or a bamboo skewer looks better than printed rods. |
-| `plungers` | any (dark brown looks like real buttons) | 3 pill-shaped pins, the size of the device's own buttons (6 × 4 mm). They sit in matching holes in the left wall. |
+| `plungers` | walnut, like the body, so they blend in | 3 pill-shaped pins, the size of the device's own buttons (6 × 4 mm). They sit in matching holes in the left wall. |
 
 Matte PLA, 0.16–0.2 mm layers, 3–4 walls, 15–20 % gyroid.
 

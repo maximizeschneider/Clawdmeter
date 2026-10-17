@@ -23,12 +23,12 @@
 //   knobs       dark     2x, decorative; pinned with a 1.75 mm filament stub
 //   legs        dark     4 legs (rear pair shorter when tilt > 0)
 //   antenna     grey     dome + 2 printable rods (or use 2 mm metal rod)
-//   plungers    any      one per button
+//   plungers    walnut   one per button, body-coloured so they blend in
 //   fit_test    any      front slice: window, corner brackets, button holes
 //
 //   openscad -D 'part="body"' -o body.stl retro_tv.scad
 
-part = "assembly"; // [assembly, body, faceplate, back_cover, knobs, legs, antenna, plungers, dims, fit_test]
+part = "assembly"; // [assembly, plate_brown, plate_cream, plate_dark, plate_grey, fit_test, body, faceplate, back_cover, knobs, legs, antenna, plungers, dims]
 
 /* [Device — measured as mounted (USB-C right, buttons left, speaker up)] */
 dev_w        = 45;     // shell width
@@ -248,29 +248,55 @@ module tv_assembly() {
     }
 }
 
+// Each part in its print orientation, lying on the bed (z = 0).
+module print_part(name) {
+    if (name == "body") {
+        rotate([90, 0, 0]) body();                 // y: -H .. 0
+    } else if (name == "faceplate") {
+        rotate([90, 0, 0]) faceplate();
+    } else if (name == "back_cover") {
+        translate([0, 0, D]) rotate([-90, 0, 0]) back_cover();   // y: 0 .. H
+    } else if (name == "knobs") {
+        for (i = [0, 1]) translate([i * 12, 0, 0]) knob();
+    } else if (name == "legs") {
+        for (i = [0 : 3]) let(l = legs[i])
+            translate([i * 14 - l[0], -l[1] * cos(tilt), -desk_c]) rotate([-tilt, 0, 0]) leg_raw(l);
+    } else if (name == "antenna") {
+        translate([0, 0, 4.5]) antenna_dome();
+        for (i = [0, 1]) translate([-19, 12 + i * 5, 2.3 * cos(30) / 2]) antenna_rod();
+    } else if (name == "plungers") {
+        for (i = [0 : len(btn_z) - 1]) translate([i * (btn_size[1] + 4), 0, 0]) plunger(plunger_len(0));
+    } else if (name == "fit_test") {
+        rotate([90, 0, 0]) intersection() {
+            body();
+            translate([-1, -1, -1]) cube([W + 2, front_t + btn_y + 4, H + 2]);
+        }
+    }
+}
+
+// One plate per filament colour: load one file, print, swap filament, next.
+// The button pins are body-coloured so they blend into the TV's side.
+module plate(colour) {
+    if (colour == "brown") {
+        translate([0, -5, 0]) print_part("body");
+        print_part("back_cover");
+        translate([W + 8, 4, 0]) print_part("plungers");
+    } else if (colour == "cream") {
+        print_part("faceplate");
+    } else if (colour == "dark") {
+        print_part("knobs");
+        translate([0, 16, 0]) print_part("legs");
+    } else if (colour == "grey") {
+        print_part("antenna");
+    }
+}
+
 if (part == "assembly") {
     translate([0, 0, -desk_c]) rotate([-tilt, 0, 0]) tv_assembly();
-} else if (part == "body") {
-    rotate([90, 0, 0]) body();
-} else if (part == "faceplate") {
-    rotate([90, 0, 0]) faceplate();
-} else if (part == "back_cover") {
-    translate([0, 0, D]) rotate([-90, 0, 0]) back_cover();
-} else if (part == "knobs") {
-    for (i = [0, 1]) translate([i * 12, 0, 0]) knob();
-} else if (part == "legs") {
-    for (i = [0 : 3]) let(l = legs[i])
-        translate([i * 14 - l[0], -l[1] * cos(tilt), -desk_c]) rotate([-tilt, 0, 0]) leg_raw(l);
-} else if (part == "antenna") {
-    translate([0, 0, 4.5]) antenna_dome();
-    for (i = [0, 1]) translate([-19, 12 + i * 5, 2.3 * cos(30) / 2]) antenna_rod();
-} else if (part == "plungers") {
-    for (i = [0 : len(btn_z) - 1]) translate([i * (btn_size[1] + 4), 0, 0]) plunger(plunger_len(0));
 } else if (part == "dims") {
     echo(str("body W x H x D = ", W, " x ", H, " x ", D, " mm; with legs + antennas: height ", H - desk_c + 38 * cos(28) + 1, " mm"));
-} else if (part == "fit_test") {
-    rotate([90, 0, 0]) intersection() {
-        body();
-        translate([-1, -1, -1]) cube([W + 2, front_t + btn_y + 4, H + 2]);
-    }
+} else if (part == "plate_brown" || part == "plate_cream" || part == "plate_dark" || part == "plate_grey") {
+    plate(part == "plate_brown" ? "brown" : part == "plate_cream" ? "cream" : part == "plate_dark" ? "dark" : "grey");
+} else {
+    print_part(part);
 }
