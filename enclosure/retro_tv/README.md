@@ -39,7 +39,7 @@ speaker up):
 | `glass` | 43 mm | 1 mm white rim all round. The window is 42 mm so no white shows. |
 | `btn_z` | 12.5 / 22.5 / 32.5 mm | button centres above the device's bottom |
 | `btn_protrude` | 1 mm | |
-| `btn_y` | 7.5 mm | **estimate**: distance from the screen surface back to the button centres |
+| `btn_y` | 9.5 mm | button centres behind the front edge of the shell |
 | `plug_len` | 14 mm | right-angle plug head |
 
 ## Print the fit test first
