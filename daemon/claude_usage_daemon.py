@@ -644,21 +644,25 @@ async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
         else:
             payload["mt"] = mt
             payload["mc"] = round(mc, 2)
-            relay = settings.get("relay_url")
-            if relay:
-                await push_month_to_relay(relay, payload["mt"], payload["mc"])
+    relay = settings.get("relay_url")
+    if relay:
+        await push_to_relay(relay, payload)
 
 
-async def push_month_to_relay(relay_url: str, mt: float, mc: float) -> None:
-    """Send this month's totals to the Wi-Fi relay (relay/relay.py): it can't read
-    local transcripts, so it shows the last total the Mac pushed. Best-effort."""
+async def push_to_relay(relay_url: str, payload: dict) -> None:
+    """Send what only this Mac can see to the Wi-Fi relay (relay/relay.py): month
+    totals (local transcripts) and the model limit (needs the user:profile scope the
+    relay's setup-token lacks). The relay shows the last push. Best-effort."""
+    body = {k: payload[k] for k in ("mt", "mc", "m", "ml") if k in payload}
+    if "mr" in payload:  # absolute, so the relay's countdown stays right after the Mac goes off
+        body["m_reset_at"] = int(time.time()) + int(payload["mr"]) * 60
     try:
         async with httpx.AsyncClient(timeout=10.0) as http:
-            resp = await http.post(f"{relay_url.rstrip('/')}/month", json={"mt": mt, "mc": mc})
+            resp = await http.post(f"{relay_url.rstrip('/')}/push", json=body)
         if resp.status_code >= 400:
-            log(f"Relay month push HTTP {resp.status_code}")
+            log(f"Relay push HTTP {resp.status_code}")
     except httpx.HTTPError as e:
-        log(f"Relay month push failed: {e}")
+        log(f"Relay push failed: {e}")
 
 
 async def poll_active_payload(selector: PlanSelector = _SELECTOR) -> dict | None:

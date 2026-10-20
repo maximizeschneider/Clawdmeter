@@ -4,15 +4,16 @@ Runs on a server (deployed with ship), so the device keeps updating while the Ma
 
   GET  /healthz            liveness, no auth
   GET  /u/<key>            usage payload (polled on demand, cached CACHE_S)
-  POST /u/<key>/month      {"mt": tokens, "mc": usd} pushed by the Mac daemon; the
-                           server can't see local transcripts, so it relays the Mac's total
+  POST /u/<key>/push       pushed by the Mac daemon, for what the server can't get itself:
+                           {"mt", "mc"}  month totals (from local transcripts)
+                           {"m", "ml", "m_reset_at"}  model limit (needs user:profile scope,
+                           which the setup-token lacks); hidden after MODEL_MAX_AGE_S
 
 Env (from /etc/ship/clawdmeter.env):
   CLAUDE_CODE_OAUTH_TOKEN  long-lived token from `claude setup-token`
   RELAY_KEY                shared secret in the URL path
   TZ                       e.g. Europe/Berlin, for the clock fields
   CLOCK                    24 | 12 | off (default 24)
-  MODEL_LIMIT              weekly bucket for the third bar (default fable; off = hide)
 """
 
 import asyncio
@@ -26,12 +27,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from daemon import claude_usage_daemon as d
-from daemon import usage_extras
 
 CACHE_S = 60
+MODEL_MAX_AGE_S = 6 * 3600  # Mac off longer than this: the frozen model % would mislead
 TOKEN = os.environ["CLAUDE_CODE_OAUTH_TOKEN"]
 KEY = os.environ["RELAY_KEY"]
-MONTH_FILE = Path(os.environ.get("DATA_DIR", ".")) / "month.json"
+PUSH_FILE = Path(os.environ.get("DATA_DIR", ".")) / "push.json"
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 _lock = asyncio.Lock()
@@ -47,28 +48,27 @@ def _this_month() -> str:
     return time.strftime("%Y-%m")
 
 
-def _month_fields() -> dict:
-    """The Mac's last pushed total, only while it's still the same calendar month."""
+def _pushed_fields() -> dict:
+    """The Mac's last push, minus whatever has gone stale."""
     try:
-        saved = json.loads(MONTH_FILE.read_text())
+        saved = json.loads(PUSH_FILE.read_text())
     except (OSError, ValueError):
         return {}
-    if saved.get("month") != _this_month():
-        return {}
-    return {"mt": saved["mt"], "mc": saved["mc"]}
+    out = {}
+    if saved.get("month") == _this_month() and "mt" in saved:
+        out |= {"mt": saved["mt"], "mc": saved["mc"]}
+    now = time.time()
+    fresh = now - saved.get("at", 0) < MODEL_MAX_AGE_S
+    if "m" in saved and fresh and saved.get("m_reset_at", 0) > now:
+        out |= {"m": saved["m"], "ml": saved["ml"], "mr": round((saved["m_reset_at"] - now) / 60)}
+    return out
 
 
 async def _poll() -> dict | None:
     try:
-        payload = await d.poll_api(TOKEN)
+        return await d.poll_api(TOKEN)
     except d.TokenExpired:
         return None
-    if payload is None:
-        return None
-    wanted = os.environ.get("MODEL_LIMIT", "fable")
-    if payload.get("acct") == "pro" and not usage_extras.is_off(wanted):
-        payload.update(await usage_extras.fetch_model_limit(TOKEN, wanted, usage_extras.label_for(wanted)))
-    return payload
 
 
 @app.get("/healthz")
@@ -92,19 +92,23 @@ async def usage(key: str):
         # Same shape as the daemon's clock fields: local wall-clock epoch, recomputed per request
         payload["t"] = int(time.time()) + time.localtime().tm_gmtoff
         payload["tf"] = 12 if clock == "12" else 24
-    payload.update(_month_fields())
+    payload.update(_pushed_fields())
     return payload
 
 
-@app.post("/u/{key}/month")
-async def month(key: str, request: Request):
+@app.post("/u/{key}/push")
+async def push(key: str, request: Request):
     _auth(key)
     body = await request.json()
+    saved = {"month": _this_month(), "at": int(time.time())}
     try:
-        mt, mc = float(body["mt"]), float(body["mc"])
+        if "mt" in body:
+            saved |= {"mt": float(body["mt"]), "mc": float(body["mc"])}
+        if "m" in body:
+            saved |= {"m": float(body["m"]), "ml": str(body["ml"])[:11], "m_reset_at": int(body["m_reset_at"])}
     except (KeyError, TypeError, ValueError):
-        raise HTTPException(422, "need numeric mt and mc")
-    tmp = MONTH_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps({"month": _this_month(), "mt": mt, "mc": mc}))
-    tmp.replace(MONTH_FILE)  # atomic: a reader never sees a half-written file
+        raise HTTPException(422, "mt+mc and m+ml+m_reset_at must come in pairs, numeric")
+    tmp = PUSH_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(saved))
+    tmp.replace(PUSH_FILE)  # atomic: a reader never sees a half-written file
     return {"ok": True}
