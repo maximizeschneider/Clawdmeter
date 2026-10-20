@@ -55,12 +55,34 @@ static void fetch_once(void) {
     http.end();
 }
 
+// Why a connect failed: is the SSID visible on 2.4 GHz, on which channel, with what auth
+static void scan_for_ssid(void) {
+    WiFi.setAutoReconnect(false);  // a pending connect attempt makes the scan fail (-2)
+    WiFi.disconnect();
+    delay(500);
+    int n = WiFi.scanNetworks();
+    Serial.printf("WIFI: scan: %d networks on 2.4 GHz, looking for '%s'\n", n, WIFI_SSID);
+    for (int i = 0; i < n; i++) {
+        Serial.printf("WIFI:   %s'%s' ch %d RSSI %d auth %d\n",
+                      WiFi.SSID(i) == WIFI_SSID ? "-> " : "   ", WiFi.SSID(i).c_str(),
+                      WiFi.channel(i), WiFi.RSSI(i), (int)WiFi.encryptionType(i));
+    }
+    WiFi.scanDelete();
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+}
+
 // Own task, so a slow TLS handshake never stalls the UI loop
 static void relay_task(void*) {
     uint32_t last_poll = 0;
     bool first = true;
     bool was_connected = false;
+    bool scanned = false;
     for (;;) {
+        if (!scanned && !was_connected && millis() > 20000 && WiFi.status() != WL_CONNECTED) {
+            scanned = true;
+            scan_for_ssid();
+        }
         bool connected = WiFi.status() == WL_CONNECTED;
         if (connected != was_connected) {
             was_connected = connected;
@@ -84,6 +106,11 @@ static void relay_task(void*) {
 }
 
 void wifi_relay_init(void) {
+    WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
+        // reason codes: 2 auth expired, 15 4-way handshake timeout (wrong password),
+        // 201 no AP found, 202 auth fail, 204 handshake timeout
+        Serial.printf("WIFI: disconnected, reason %d\n", info.wifi_sta_disconnected.reason);
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
     // Modem sleep stays on (default): required while BLE shares the radio
