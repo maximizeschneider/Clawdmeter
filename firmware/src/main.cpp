@@ -7,6 +7,9 @@
 #include "data.h"
 #include "ui.h"
 #include "ble.h"
+#ifdef WIFI_RELAY
+#include "wifi_relay.h"
+#endif
 #include "splash.h"
 #include "usage_rate.h"
 #include "idle.h"
@@ -195,6 +198,26 @@ static void check_serial_cmd() {
 // reset line). Called exactly once at the start of setup().
 extern "C" void board_init(void);
 
+// New payload parsed into `usage` (from BLE or, in *_wifi builds, the relay).
+static void apply_usage(void) {
+    int g_before = usage_rate_group();
+    bool session_reset = usage_rate_sample(usage.session_pct);
+    int g_after = usage_rate_group();
+    // 5-hour session limit refilled → chime so the user knows they can
+    // use Claude again (no-op on boards without a buzzer). Gated on the
+    // daemon's opt-in `chime` config; the `buzz` serial cmd ignores it.
+    if (session_reset && usage.chime) {
+        Serial.println("session reset detected — chime");
+        sound_hal_play_reset();
+    }
+    if (g_after != g_before) {
+        Serial.printf("usage rate: group %d -> %d (s=%.2f%%)\n",
+            g_before, g_after, usage.session_pct);
+        if (splash_is_active()) splash_pick_for_current_rate();
+    }
+    ui_update(&usage);
+}
+
 void setup() {
     Serial.begin(115200);
     delay(300);
@@ -234,6 +257,9 @@ void setup() {
     lv_indev_set_read_cb(indev, my_touch_cb);
 
     ble_init();
+#ifdef WIFI_RELAY
+    wifi_relay_init();
+#endif
     input_hal_init();
 
     ui_init();
@@ -380,28 +406,21 @@ void loop() {
     check_serial_cmd();
 
     if (ble_has_data()) {
+#ifdef WIFI_RELAY
+        wifi_relay_note_ble_data();
+#endif
         if (parse_json(ble_get_data(), &usage)) {
-            int g_before = usage_rate_group();
-            bool session_reset = usage_rate_sample(usage.session_pct);
-            int g_after = usage_rate_group();
-            // 5-hour session limit refilled → chime so the user knows they can
-            // use Claude again (no-op on boards without a buzzer). Gated on the
-            // daemon's opt-in `chime` config; the `buzz` serial cmd ignores it.
-            if (session_reset && usage.chime) {
-                Serial.println("session reset detected — chime");
-                sound_hal_play_reset();
-            }
-            if (g_after != g_before) {
-                Serial.printf("usage rate: group %d -> %d (s=%.2f%%)\n",
-                    g_before, g_after, usage.session_pct);
-                if (splash_is_active()) splash_pick_for_current_rate();
-            }
-            ui_update(&usage);
+            apply_usage();
             ble_send_ack();
         } else {
             ble_send_nack();
         }
     }
+#ifdef WIFI_RELAY
+    if (wifi_relay_has_data() && parse_json(wifi_relay_get_data(), &usage)) {
+        apply_usage();
+    }
+#endif
 
     delay(5);
 }

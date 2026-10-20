@@ -18,3 +18,6 @@ daemon/.venv/
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Wi-Fi relay build secrets (Wi-Fi password, relay key)
+firmware/wifi_relay/wifi_secrets.h
