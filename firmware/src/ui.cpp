@@ -265,7 +265,11 @@ static uint32_t  last_data_ms = 0;      // lv_tick when the last valid usage upd
 static bool      data_received = false; // any valid update since boot
 static bool      data_ok = true;        // last payload's ok flag; a {"ok":false} beat = "no fresh data"
 static int       view_state = -1;       // -1 unknown / 0 pair / 1 idle / 2 usage
+#ifdef WIFI_RELAY
+static const uint32_t DATA_FRESH_MS = 180000; // Wi-Fi polls every 60 s: ride out a missed poll or two
+#else
 static const uint32_t DATA_FRESH_MS = 90000;  // usage counts as "live" within this window (daemon sends ~60s)
+#endif
 
 // ---- Shared ----
 static lv_image_dsc_t logo_dsc;

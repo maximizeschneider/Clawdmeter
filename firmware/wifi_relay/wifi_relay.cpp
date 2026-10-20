@@ -17,6 +17,7 @@
 #endif
 
 #define POLL_MS       60000  // relay caches 60 s, so faster polling gains nothing
+#define RETRY_MS      15000  // after a failed poll: retry soon, before the screen goes stale
 #define BLE_FRESH_MS  90000  // daemon delivered within this window → skip Wi-Fi
 #define BUF_SIZE      512    // same as BLE_BUF_SIZE; payloads are ~250 bytes
 
@@ -27,16 +28,17 @@ static volatile uint32_t last_ble_ms = 0;
 static volatile bool ble_seen = false;
 static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 
-static void fetch_once(void) {
+static bool fetch_once(void) {
     WiFiClientSecure client;
     client.setCACert(ISRG_ROOTS_PEM);  // verify the server: Let's Encrypt roots only
     HTTPClient http;
     http.setTimeout(10000);
     if (!http.begin(client, RELAY_URL)) {
         Serial.println("WIFI: bad RELAY_URL");
-        return;
+        return false;
     }
     int code = http.GET();
+    bool ok = false;
     if (code == 200) {
         String body = http.getString();
         if (body.length() < BUF_SIZE) {
@@ -44,6 +46,7 @@ static void fetch_once(void) {
             memcpy(shared_buf, body.c_str(), body.length() + 1);
             ready = true;
             portEXIT_CRITICAL(&mux);
+            ok = true;
             Serial.printf("WIFI: got %u bytes, free heap %u\n", body.length(), ESP.getFreeHeap());
         } else {
             Serial.printf("WIFI: payload too large (%u)\n", body.length());
@@ -53,6 +56,7 @@ static void fetch_once(void) {
         Serial.printf("WIFI: GET failed: %d %s\n", code, http.errorToString(code).c_str());
     }
     http.end();
+    return ok;
 }
 
 // Why a connect failed: is the SSID visible on 2.4 GHz, on which channel, with what auth
@@ -75,6 +79,7 @@ static void scan_for_ssid(void) {
 // Own task, so a slow TLS handshake never stalls the UI loop
 static void relay_task(void*) {
     uint32_t last_poll = 0;
+    uint32_t interval = POLL_MS;
     bool first = true;
     bool was_connected = false;
     bool scanned = false;
@@ -90,13 +95,13 @@ static void relay_task(void*) {
                                          WiFi.localIP().toString().c_str(), WiFi.RSSI());
             else           Serial.println("WIFI: disconnected (auto-reconnecting)");
         }
-        bool due = first || millis() - last_poll >= POLL_MS;
+        bool due = first || millis() - last_poll >= interval;
         bool ble_fresh = ble_seen && millis() - last_ble_ms < BLE_FRESH_MS;
         if (connected && due) {
             if (ble_fresh) {
                 Serial.println("WIFI: skip poll, daemon is delivering over BLE");
             } else {
-                fetch_once();
+                interval = fetch_once() ? POLL_MS : RETRY_MS;
             }
             last_poll = millis();
             first = false;
