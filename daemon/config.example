@@ -76,3 +76,7 @@ clock = off
 # next poll, and re-prices the whole current month.
 # price.fable-5-1 = 10, 50, 0.25
 # price.opus-5-5  = 4, 20, 0.20
+
+# Wi-Fi relay (relay/relay.py, branch wifi-relay): push this month's totals
+# there so the device keeps showing them while this Mac is off.
+# relay_url = https://clawdmeter.example.com/u/<RELAY_KEY>

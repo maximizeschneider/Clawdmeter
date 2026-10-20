@@ -1,0 +1,8 @@
+# Deploy with ship (hetzner repo): ./ship deploy ~/projects/Clawdmeter/relay
+name     = "clawdmeter"
+runtime  = "python"
+start    = "uvicorn relay:app --host $HOST --port $PORT"
+expose   = "public"
+health   = "/healthz"
+data     = true   # month.json pushed by the Mac daemon
+env_file = true   # CLAUDE_CODE_OAUTH_TOKEN, RELAY_KEY, TZ, CLOCK

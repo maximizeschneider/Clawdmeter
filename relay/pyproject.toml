@@ -1,0 +1,14 @@
+[project]
+name = "clawdmeter-relay"
+version = "0.1.0"
+description = "HTTP relay so Wi-Fi builds update while the Mac is off"
+requires-python = ">=3.12"
+dependencies = [
+    "bleak==3.0.2",  # only because daemon/claude_usage_daemon.py imports it at module level
+    "fastapi==0.151.0",
+    "httpx==0.28.1",
+    "uvicorn==0.54.0",
+]
+
+[tool.uv]
+package = false

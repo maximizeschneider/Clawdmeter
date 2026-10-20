@@ -644,6 +644,21 @@ async def add_extra_fields(payload: dict, token: str, dirs: list[Path]) -> None:
         else:
             payload["mt"] = mt
             payload["mc"] = round(mc, 2)
+            relay = settings.get("relay_url")
+            if relay:
+                await push_month_to_relay(relay, payload["mt"], payload["mc"])
+
+
+async def push_month_to_relay(relay_url: str, mt: float, mc: float) -> None:
+    """Send this month's totals to the Wi-Fi relay (relay/relay.py): it can't read
+    local transcripts, so it shows the last total the Mac pushed. Best-effort."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as http:
+            resp = await http.post(f"{relay_url.rstrip('/')}/month", json={"mt": mt, "mc": mc})
+        if resp.status_code >= 400:
+            log(f"Relay month push HTTP {resp.status_code}")
+    except httpx.HTTPError as e:
+        log(f"Relay month push failed: {e}")
 
 
 async def poll_active_payload(selector: PlanSelector = _SELECTOR) -> dict | None:
