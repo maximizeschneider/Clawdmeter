@@ -814,9 +814,16 @@ void ui_update(const UsageData* data) {
 static void update_view_state(void) {
     if (!usage_group || !pair_group || !idle_group) return;
     int v;
+    bool fresh = data_received && data_ok && (lv_tick_get() - last_data_ms) < DATA_FRESH_MS;
+#ifdef WIFI_RELAY
+    if (fresh) {
+        v = 2;  // live usage: Wi-Fi data counts even with no BLE host (Mac off)
+    } else if (!s_ble_connected) {
+#else
     if (!s_ble_connected) {
+#endif
         v = 0;  // pairing hint
-    } else if (data_received && data_ok && (lv_tick_get() - last_data_ms) < DATA_FRESH_MS) {
+    } else if (fresh) {
         v = 2;  // live usage
     } else {
         v = 1;  // idle / Zzz
@@ -871,7 +878,11 @@ void ui_tick_anim(void) {
 
     // Status text by priority. Whimsical messages only when connected & settled.
     const char* text;
+#ifdef WIFI_RELAY
+    if (!s_ble_connected && view_state != 2) {  // view 2 without BLE: data via the relay
+#else
     if (!s_ble_connected) {
+#endif
         text = "Waiting";              // advertising / waiting for a host connection
     } else if (view_state == 1) {      // idle — alternate so it reads as alive AND data-less
         text = (anim_msg_idx & 1) ? "No data" : "Listening";
